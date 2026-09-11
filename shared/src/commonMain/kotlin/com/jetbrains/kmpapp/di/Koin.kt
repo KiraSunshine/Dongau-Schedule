@@ -1,0 +1,72 @@
+package com.jetbrains.kmpapp.di
+
+import com.jetbrains.kmpapp.data.ScheduleRepository
+import com.jetbrains.kmpapp.data.api.DongauScheduleApi
+import com.jetbrains.kmpapp.data.storage.PlatformStorage
+import com.jetbrains.kmpapp.data.storage.ScheduleStorage
+import com.jetbrains.kmpapp.data.update.AppUpdateChecker
+import com.jetbrains.kmpapp.screens.other.OtherViewModel
+import com.jetbrains.kmpapp.screens.schedule.ScheduleViewModel
+import com.jetbrains.kmpapp.data.FreeRoomsRepository
+import com.jetbrains.kmpapp.screens.rooms.FreeRoomsViewModel
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+import org.koin.core.context.startKoin
+import org.koin.core.module.dsl.factoryOf
+import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.module
+
+import com.jetbrains.kmpapp.data.TaskRepository
+import com.jetbrains.kmpapp.data.sync.UnifiedSyncManager
+import com.jetbrains.kmpapp.screens.tasks.TasksViewModel
+
+import com.jetbrains.kmpapp.data.power.PlatformPowerManager
+import io.ktor.client.plugins.HttpTimeout
+
+val dataModule = module {
+    single {
+        val json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
+        HttpClient {
+            install(ContentNegotiation) {
+                json(json, contentType = ContentType.Any)
+            }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 15_000
+                connectTimeoutMillis = 10_000
+                socketTimeoutMillis = 15_000
+            }
+        }
+    }
+
+    singleOf(::PlatformPowerManager)
+    singleOf(::PlatformStorage)
+    singleOf(::UnifiedSyncManager)
+    singleOf(::DongauScheduleApi)
+    singleOf(::ScheduleStorage)
+    singleOf(::ScheduleRepository)
+    singleOf(::AppUpdateChecker)
+    singleOf(::FreeRoomsRepository)
+    singleOf(::TaskRepository)
+}
+
+val viewModelModule = module {
+    factoryOf(::ScheduleViewModel)
+    factoryOf(::OtherViewModel)
+    factoryOf(::FreeRoomsViewModel)
+    factoryOf(::TasksViewModel)
+}
+
+fun initKoin() {
+    startKoin {
+        modules(
+            dataModule,
+            viewModelModule,
+        )
+    }
+}

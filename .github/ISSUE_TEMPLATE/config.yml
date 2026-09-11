@@ -1,0 +1,11 @@
+﻿blank_issues_enabled: false
+contact_links:
+  - name: 💬 Вопросы, обсуждения и Issue
+    url: https://github.com/KiraSunshine/Dongau-Schedule/issues
+    about: Новости о проекте, обновлениях, релизах и обратная связь
+  - name: 📦 Релизы и новые версии приложения
+    url: https://github.com/KiraSunshine/Dongau-Schedule/releases
+    about: Скачать последние сборки APK (Android) и IPA (iOS)
+  - name: ℹ️ Официальный портал ДонГУ
+    url: https://edu.dongau.ru
+    about: Проверить расписание на официальном портале университета

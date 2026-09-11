@@ -1,0 +1,61 @@
+# Build & Gradle
+.gradle/
+build/
+**/build/
+!src/**/build/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Android & IDE
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# macOS & OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# iOS & Xcode
+xcuserdata/
+DerivedData/
+*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+
+# Python & Builder artifacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+.venv/
+env/
+dist_free_rooms/
+dist_version/
+dist/
+dist_latest/
+dist_archive/
+download_apk/
+download_ipa/
+archive_notes.md
+release_notes.md
+
+# Application packages
+*.apk
+*.aab
+*.ipa
+# Local Repowise index and generated local integration files
+.repowise/
+
+# Local AI agent integrations
+.claude/
+.mcp.json
+.vscode/mcp.json
+.vscode/extensions.json
