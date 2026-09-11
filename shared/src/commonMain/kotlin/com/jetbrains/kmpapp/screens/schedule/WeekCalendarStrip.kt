@@ -71,7 +71,7 @@ fun WeekCalendarStrip(
     LaunchedEffect(selectedMonday) {
         val currentMonday = baseMonday.plus(DatePeriod(days = (pagerState.currentPage - BASE_PAGE) * 7))
         if (currentMonday != selectedMonday && !pagerState.isScrollInProgress) {
-            pagerState.animateScrollToPage(targetPage)
+            pagerState.scrollToPage(targetPage)
         }
     }
 
@@ -294,17 +294,17 @@ fun WeekCalendarStrip(
 private fun getLessonDotColor(type: com.jetbrains.kmpapp.data.model.LessonType, isDark: Boolean): Color {
     return if (isDark) {
         when (type) {
-            com.jetbrains.kmpapp.data.model.LessonType.LECTURE -> Color(0xFF38BDF8)
-            com.jetbrains.kmpapp.data.model.LessonType.PRACTICE -> Color(0xFF4ADE80)
-            com.jetbrains.kmpapp.data.model.LessonType.LAB -> Color(0xFFFB923C)
-            com.jetbrains.kmpapp.data.model.LessonType.OTHER -> Color(0xFFC084FC)
+            com.jetbrains.kmpapp.data.model.LessonType.LECTURE -> Color(0xFF4ADE80)
+            com.jetbrains.kmpapp.data.model.LessonType.PRACTICE -> Color(0xFFFBBF24)
+            com.jetbrains.kmpapp.data.model.LessonType.LAB -> Color(0xFFA78BFA)
+            com.jetbrains.kmpapp.data.model.LessonType.OTHER -> Color(0xFF9CA3AF)
         }
     } else {
         when (type) {
-            com.jetbrains.kmpapp.data.model.LessonType.LECTURE -> Color(0xFF0284C7)
-            com.jetbrains.kmpapp.data.model.LessonType.PRACTICE -> Color(0xFF16A34A)
-            com.jetbrains.kmpapp.data.model.LessonType.LAB -> Color(0xFFEA580C)
-            com.jetbrains.kmpapp.data.model.LessonType.OTHER -> Color(0xFF9333EA)
+            com.jetbrains.kmpapp.data.model.LessonType.LECTURE -> Color(0xFF16A34A)
+            com.jetbrains.kmpapp.data.model.LessonType.PRACTICE -> Color(0xFFD97706)
+            com.jetbrains.kmpapp.data.model.LessonType.LAB -> Color(0xFF8B5CF6)
+            com.jetbrains.kmpapp.data.model.LessonType.OTHER -> Color(0xFF6B7280)
         }
     }
 }

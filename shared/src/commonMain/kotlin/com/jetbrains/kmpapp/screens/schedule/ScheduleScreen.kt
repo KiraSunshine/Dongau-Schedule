@@ -136,15 +136,25 @@ private fun ScheduleMainContent(
     val selectedPage = basePage + today.daysUntil(selectedDate)
     val pagerState = rememberPagerState(initialPage = selectedPage, pageCount = { 2001 })
 
+    // Page we are programmatically scrolling to (click on a day / Сегодня / external selection).
+    // While non-null, the live-update collector below must not override the chosen date.
+    var pendingScrollPage by remember { mutableStateOf<Int?>(null) }
+
     LaunchedEffect(selectedDate) {
         val targetPage = basePage + today.daysUntil(selectedDate)
         if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
-            pagerState.animateScrollToPage(targetPage)
+            pendingScrollPage = targetPage
+            try {
+                pagerState.animateScrollToPage(targetPage)
+            } finally {
+                pendingScrollPage = null
+            }
         }
     }
 
     LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.settledPage }.collect { page ->
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            if (pendingScrollPage != null) return@collect
             val date = today.plus(DatePeriod(days = page - basePage))
             if (date != selectedDate) viewModel.selectDate(date)
         }

@@ -43,37 +43,37 @@ import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF1E5BB0),
+    primary = Color(0xFF1B44C0),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD6E3FF),
-    onPrimaryContainer = Color(0xFF001B3E),
-    secondary = Color(0xFF555F71),
+    primaryContainer = Color(0xFFC8D6FF),
+    onPrimaryContainer = Color(0xFF00124B),
+    secondary = Color(0xFFB0247D),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD9E3F8),
-    onSecondaryContainer = Color(0xFF121C2B),
-    background = Color(0xFFFDFBFF),
-    onBackground = Color(0xFF1A1C1E),
-    surface = Color(0xFFFDFBFF),
-    onSurface = Color(0xFF1A1C1E),
-    surfaceContainer = Color(0xFFF0F3F9),
-    surfaceContainerHigh = Color(0xFFE8EDF5)
+    secondaryContainer = Color(0xFFFBD7EC),
+    onSecondaryContainer = Color(0xFF38041F),
+    background = Color(0xFFFFFFFF),
+    onBackground = Color(0xFF101828),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF101828),
+    surfaceContainer = Color(0xFFEDF0F6),
+    surfaceContainerHigh = Color(0xFFE2E7F0)
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFA8C7FA),
-    onPrimary = Color(0xFF003062),
-    primaryContainer = Color(0xFF00468A),
-    onPrimaryContainer = Color(0xFFD6E3FF),
-    secondary = Color(0xFFBDC7DC),
-    onSecondary = Color(0xFF273141),
-    secondaryContainer = Color(0xFF3D4758),
-    onSecondaryContainer = Color(0xFFD9E3F8),
-    background = Color(0xFF111318),
-    onBackground = Color(0xFFE2E2E9),
-    surface = Color(0xFF111318),
-    onSurface = Color(0xFFE2E2E9),
-    surfaceContainer = Color(0xFF1D2026),
-    surfaceContainerHigh = Color(0xFF282A30)
+    primary = Color(0xFFC4D3FF),
+    onPrimary = Color(0xFF101836),
+    primaryContainer = Color(0xFF28326E),
+    onPrimaryContainer = Color(0xFFE4E9FF),
+    secondary = Color(0xFFF3B1DC),
+    onSecondary = Color(0xFF350A2A),
+    secondaryContainer = Color(0xFF5A2A4B),
+    onSecondaryContainer = Color(0xFFFFD9EE),
+    background = Color(0xFF0B0B12),
+    onBackground = Color(0xFFF4EFFA),
+    surface = Color(0xFF131320),
+    onSurface = Color(0xFFF4EFFA),
+    surfaceContainer = Color(0xFF1D1D2E),
+    surfaceContainerHigh = Color(0xFF262638)
 )
 
 @Composable

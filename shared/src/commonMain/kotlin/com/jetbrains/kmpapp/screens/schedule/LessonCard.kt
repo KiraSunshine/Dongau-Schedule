@@ -120,7 +120,7 @@ fun LessonCard(
             .padding(horizontal = horizontalMargin, vertical = 6.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = typeBg
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -173,7 +173,7 @@ fun LessonCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(typeBg)
+                                .background(typeTextColor.copy(alpha = 0.15f))
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
@@ -464,12 +464,12 @@ internal fun getTypeBadgeColors(lessonType: LessonType): Pair<Color, Color> {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     return when (lessonType) {
         LessonType.LECTURE ->
-            if (isDark) Color(0xFF0C4A6E) to Color(0xFFBAE6FD) else Color(0xFFBAE6FD) to Color(0xFF0369A1)
-        LessonType.PRACTICE ->
             if (isDark) Color(0xFF14532D) to Color(0xFFBBF7D0) else Color(0xFFBBF7D0) to Color(0xFF15803D)
+        LessonType.PRACTICE ->
+            if (isDark) Color(0xFF78350F) to Color(0xFFFDE68A) else Color(0xFFFEF3C7) to Color(0xFFB45309)
         LessonType.LAB ->
-            if (isDark) Color(0xFF7C2D12) to Color(0xFFFED7AA) else Color(0xFFFED7AA) to Color(0xFFC2410C)
+            if (isDark) Color(0xFF4C1D95) to Color(0xFFDDD6FE) else Color(0xFFEDE9FE) to Color(0xFF6D28D9)
         LessonType.OTHER ->
-            if (isDark) Color(0xFF581C87) to Color(0xFFE9D5FF) else Color(0xFFE9D5FF) to Color(0xFF7E22CE)
+            if (isDark) Color(0xFF374151) to Color(0xFFE5E7EB) else Color(0xFFE5E7EB) to Color(0xFF4B5563)
     }
 }
