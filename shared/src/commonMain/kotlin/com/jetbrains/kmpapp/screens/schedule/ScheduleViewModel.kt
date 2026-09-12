@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.DayOfWeek
@@ -94,12 +95,11 @@ class ScheduleViewModel(
     val selectedLessonForDetail: StateFlow<Lesson?> = _selectedLessonForDetail.asStateFlow()
 
     val datesWithLessons: StateFlow<Set<LocalDate>> = repository.currentLessons
-        .combine(MutableStateFlow(Unit)) { lessons, _ ->
-            lessons.map { it.date }.toSet()
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+        .map { lessons -> lessons.map { it.date }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     val dayLessonSummaries: StateFlow<Map<LocalDate, DayLessonSummary>> = repository.currentLessons
-        .combine(MutableStateFlow(Unit)) { lessons, _ ->
+        .map { lessons ->
             lessons.groupBy { it.date }.mapValues { (_, dayLessons) ->
                 val orderedTypes = dayLessons.groupBy { it.bellNumber }
                     .entries.sortedBy { it.key }
@@ -108,38 +108,36 @@ class ScheduleViewModel(
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    val daySlots: StateFlow<List<ScheduleSlot>> = combine(
+    // Precomputed map date -> slots (rebuilt once when data/settings change, not per page render)
+    val slotsByDate: StateFlow<Map<LocalDate, List<ScheduleSlot>>> = combine(
         repository.currentLessons,
-        _selectedDate,
         repository.showEmptyLessons
-    ) { lessons, date, showEmpty -> slotsForDate(lessons, date, showEmpty) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    ) { lessons, showEmpty ->
+        val map = HashMap<LocalDate, List<ScheduleSlot>>()
+        for ((date, dayLessons) in lessons.groupBy { it.date }) {
+            map[date] = buildSlotsForDay(dayLessons, showEmpty)
+        }
+        map
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val daySlots: StateFlow<List<ScheduleSlot>> = combine(
+        _selectedDate,
+        slotsByDate,
+        repository.showEmptyLessons
+    ) { date, map, showEmpty ->
+        map[date] ?: emptyDaySlots(date, showEmpty)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val currentLessons: StateFlow<List<Lesson>> = repository.currentLessons
     val showEmptyLessons: StateFlow<Boolean> = repository.showEmptyLessons
 
-    fun slotsForDate(
-        date: LocalDate,
-        lessons: List<Lesson> = currentLessons.value,
-        showEmpty: Boolean = showEmptyLessons.value
-    ): List<ScheduleSlot> = slotsForDate(lessons, date, showEmpty)
+    fun slotsForDate(date: LocalDate): List<ScheduleSlot> {
+        slotsByDate.value[date]?.let { return it }
+        return emptyDaySlots(date, showEmptyLessons.value)
+    }
 
-    private fun slotsForDate(
-        lessons: List<Lesson>,
-        date: LocalDate,
-        showEmpty: Boolean
-    ): List<ScheduleSlot> {
-        val forDay = lessons.filter { it.date == date }
-        if (forDay.isEmpty()) {
-            return if (showEmpty && date.dayOfWeek != DayOfWeek.SUNDAY) {
-                (1..7).map { bell ->
-                    val bellInfo = defaultBells.firstOrNull { it.number == bell }
-                    ScheduleSlot.Empty(bell, bellInfo?.startTime ?: "—", bellInfo?.endTime ?: "—")
-                }
-            } else emptyList()
-        }
-
-        val bellMap = forDay.groupBy { it.bellNumber }
+    private fun buildSlotsForDay(dayLessons: List<Lesson>, showEmpty: Boolean): List<ScheduleSlot> {
+        val bellMap = dayLessons.groupBy { it.bellNumber }
         if (!showEmpty) {
             return bellMap.entries.sortedBy { it.key }.map { (bell, items) ->
                 val first = items.first()
@@ -148,7 +146,7 @@ class ScheduleViewModel(
         }
 
         val result = mutableListOf<ScheduleSlot>()
-        val upperBell = maxOf(forDay.maxOfOrNull { it.bellNumber } ?: 7, 7)
+        val upperBell = maxOf(dayLessons.maxOfOrNull { it.bellNumber } ?: 7, 7)
         for (bell in 1..upperBell) {
             val items = bellMap[bell]
             if (!items.isNullOrEmpty()) {
@@ -160,6 +158,14 @@ class ScheduleViewModel(
             }
         }
         return result
+    }
+
+    private fun emptyDaySlots(date: LocalDate, showEmpty: Boolean): List<ScheduleSlot> {
+        if (!showEmpty || date.dayOfWeek == DayOfWeek.SUNDAY) return emptyList()
+        return (1..7).map { bell ->
+            val bellInfo = defaultBells.firstOrNull { it.number == bell }
+            ScheduleSlot.Empty(bell, bellInfo?.startTime ?: "—", bellInfo?.endTime ?: "—")
+        }
     }
 
     fun selectDate(date: LocalDate) {
