@@ -7,10 +7,10 @@
       "name": "Расписание ДонГУ",
       "bundleIdentifier": "ru.dongau.schedule",
       "developerName": "KiraSunshine",
-      "localizedDescription": "Расписание пар ДонГУ: поиск свободных аудиторий, задачи и офлайн-кеш.\n\nСборка: 26.0.5-dev.3\nОбновлено: 2026-09-12 13:31 UTC",
+      "localizedDescription": "Расписание пар ДонГУ: поиск свободных аудиторий, задачи и офлайн-кеш.\n\nСборка: 26.0.3-dev.4\nОбновлено: 2026-09-16 16:09 UTC",
       "iconURL": "https://raw.githubusercontent.com/KiraSunshine/Dongau-Schedule/main/shared/src/commonMain/composeResources/drawable/app_icon.png",
-      "version": "26.0.5-dev.3",
-      "versionDate": "2026-09-12T13:31:33.197869+00:00",
+      "version": "26.0.3-dev.4",
+      "versionDate": "2026-09-16T16:09:03.217851+00:00",
       "downloadURL": "https://github.com/KiraSunshine/Dongau-Schedule/releases/download/preview/Dongau-Schedule-preview.ipa",
       "tintColor": "4F46E5"
     }
