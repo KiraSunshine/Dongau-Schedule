@@ -111,6 +111,8 @@ private fun ScheduleMainContent(
     val savedTargets by viewModel.savedTargets.collectAsState()
     val selectedTarget by viewModel.selectedTarget.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
+    val currentLessons by viewModel.currentLessons.collectAsState()
+    val showEmptyLessons by viewModel.showEmptyLessons.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val activeDiff by viewModel.activeDiff.collectAsState()
@@ -128,8 +130,9 @@ private fun ScheduleMainContent(
     val diffSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val scope = rememberCoroutineScope()
+    val isToday = selectedDate == com.jetbrains.kmpapp.data.model.DateUtils.today()
     val basePage = 1000
-    val today = remember { com.jetbrains.kmpapp.data.model.DateUtils.today() }
+    val today = com.jetbrains.kmpapp.data.model.DateUtils.today()
     val selectedPage = basePage + today.daysUntil(selectedDate)
     val pagerState = rememberPagerState(initialPage = selectedPage, pageCount = { 2001 })
 
@@ -232,6 +235,13 @@ private fun ScheduleMainContent(
                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                 )
 
+                Text(
+                    text = "diag: id=${selectedTarget?.id} lessons=${currentLessons.size} date=$selectedDate err=${errorMessage ?: "-"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
                 PullToRefreshBox(
                     isRefreshing = isLoading,
                     onRefresh = { viewModel.refresh() },
@@ -242,7 +252,7 @@ private fun ScheduleMainContent(
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
                         val pageDate = today.plus(DatePeriod(days = page - basePage))
-                        val pageSlots = viewModel.slotsForDate(pageDate)
+                        val pageSlots = viewModel.slotsForDate(pageDate, currentLessons, showEmptyLessons)
                         key(pageDate) {
                             DaySchedulePage(
                                 date = pageDate,

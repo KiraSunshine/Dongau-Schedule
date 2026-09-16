@@ -5,14 +5,101 @@ import com.jetbrains.kmpapp.data.model.DongauScheduleResponse
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.LessonType
 import com.jetbrains.kmpapp.data.model.defaultBells
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 
 object DongauScheduleParser {
 
+    private data class ParsedTemplate(
+        val lesson: Lesson,
+        val weekType: Int
+    )
+
     fun parse(response: DongauScheduleResponse): List<Lesson> {
-        return response.rasp.mapNotNull { item ->
-            parseItem(item)
-        }.sortedWith(compareBy({ it.date }, { it.bellNumber }))
+        val templates = response.rasp.mapNotNull { parseTemplate(it) }
+        if (templates.isEmpty()) return emptyList()
+        val lessons = if (response.isCyclical) {
+            expandCyclic(templates)
+        } else {
+            templates.map { it.lesson }
+        }
+        return lessons.sortedWith(compareBy({ it.date }, { it.bellNumber }))
+    }
+
+    private fun parseTemplate(item: DongauScheduleItem): ParsedTemplate? {
+        val lesson = parseItem(item) ?: return null
+        return ParsedTemplate(lesson, item.weekType)
+    }
+
+    private fun expandCyclic(templates: List<ParsedTemplate>): List<Lesson> {
+        val anchorDate = templates.minOf { it.lesson.date }
+        val anchorWeekStart = mondayOf(anchorDate)
+        val anchorType = templates.firstOrNull {
+            it.lesson.date == anchorDate && it.weekType != 0
+        }?.weekType ?: 0
+        val semesterStart = semesterStartFor(anchorDate)
+        val semesterEnd = semesterEndFor(anchorDate)
+        val startWeekStart = mondayOf(semesterStart)
+
+        val result = mutableListOf<Lesson>()
+        var weekOffset = 0
+        while (true) {
+            val weekStart = startWeekStart.plus(DatePeriod(days = weekOffset * 7))
+            if (weekStart > semesterEnd) break
+
+            val diffWeeks = anchorWeekStart.daysUntil(weekStart) / 7
+            val targetType = if (anchorType == 0 || diffWeeks % 2 == 0) {
+                anchorType
+            } else {
+                oppositeType(anchorType)
+            }
+
+            for (template in templates) {
+                if (template.weekType != 0 && template.weekType != targetType) continue
+                val original = template.lesson
+                val dayOffset = original.date.dayOfWeek.ordinal
+                val targetDate = weekStart.plus(DatePeriod(days = dayOffset))
+                if (targetDate < semesterStart || targetDate > semesterEnd) continue
+                result += original.copy(
+                    id = "${original.id}_$targetDate",
+                    date = targetDate
+                )
+            }
+            weekOffset++
+        }
+        return result
+    }
+
+    private fun oppositeType(type: Int): Int {
+        return if (type == 1) 2 else 1
+    }
+
+    private fun mondayOf(date: LocalDate): LocalDate {
+        return date.minus(DatePeriod(days = date.dayOfWeek.ordinal))
+    }
+
+    private fun semesterStartFor(date: LocalDate): LocalDate {
+        val monthNum = date.month.ordinal + 1
+        return if (monthNum in 2..8) {
+            LocalDate(date.year, 2, 9)
+        } else {
+            val startYear = if (monthNum == 1) date.year - 1 else date.year
+            LocalDate(startYear, 9, 1)
+        }
+    }
+
+    private fun semesterEndFor(date: LocalDate): LocalDate {
+        val monthNum = date.month.ordinal + 1
+        return if (monthNum in 2..8) {
+            LocalDate(date.year, 6, 30)
+        } else {
+            val startYear = if (monthNum == 1) date.year - 1 else date.year
+            LocalDate(startYear, 12, 31)
+        }
     }
 
     private fun parseItem(item: DongauScheduleItem): Lesson? {

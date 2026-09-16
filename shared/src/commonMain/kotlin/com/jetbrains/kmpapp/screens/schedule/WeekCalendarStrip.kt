@@ -27,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -56,8 +55,8 @@ fun WeekCalendarStrip(
     lessonSummaries: Map<LocalDate, DayLessonSummary> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
-    val today = remember { DateUtils.today() }
-    val baseMonday = remember { DateUtils.getWeekDates(today).first() }
+    val today = DateUtils.today()
+    val baseMonday = DateUtils.getWeekDates(today).first()
 
     val selectedMonday = DateUtils.getWeekDates(selectedDate).first()
     val weeksOffset = (baseMonday.daysUntil(selectedMonday) / 7)
