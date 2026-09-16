@@ -10,7 +10,7 @@ object AppVersion {
      *  - contributor build           → 26.X-contrib.N
      * После стабильного релиза v26.0.0 руками поднимается до 26.1.0.
      */
-    const val RELEASE_VERSION = "26.0.3"
+    const val RELEASE_VERSION = "26.0.6"
     const val VERSION_NAME = RELEASE_VERSION
 
     /** stable | beta | rc | dev | contrib — подставляет CI через tools/versioning.py */
@@ -21,7 +21,7 @@ object AppVersion {
      * (github.run_started_at): монотонно во всех каналах, влезает в
      * Int32 / Android versionCode (max 2147483647). github.run_id НЕ подходит.
      */
-    const val BUILD_NUMBER = 32
+    const val BUILD_NUMBER = 34
     const val COMMIT_SHA = "local"
 
     /** Стабильный канал обновлений (обновляется только стабильными релизами). */
