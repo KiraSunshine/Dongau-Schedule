@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -154,9 +155,18 @@ fun AboutScreen(
                 }
             ) {
                 Text(
-                    text = "Расписание ДонГУ (неофициальное)",
+                    text = "Расписание ДонГУ",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "(неофициальное)",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -246,6 +256,18 @@ fun AboutScreen(
                     AcknowledgmentItem(
                         title = "Данные расписания занятий",
                         description = "ДонГУ Schedule API (edu.dongau.ru)"
+                    )
+
+                    androidx.compose.material3.HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                    )
+
+                    // 2. Parent application credit
+                    AcknowledgmentItem(
+                        title = "Материнское приложение",
+                        description = "Mirea-Schedule",
+                        onClick = { uriHandler.openUri("https://github.com/l1ratch/MIREA-Schedule") }
                     )
 
                     androidx.compose.material3.HorizontalDivider(

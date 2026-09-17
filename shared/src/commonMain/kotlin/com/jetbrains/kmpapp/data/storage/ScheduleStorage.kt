@@ -131,9 +131,8 @@ class ScheduleStorage(
                     val loaded = dockTabsStr.split(",").mapNotNull { name ->
                         try { AppTab.valueOf(name.trim()) } catch (_: Throwable) { null }
                     }
-                    val legacyDefault = listOf(AppTab.SCHEDULE, AppTab.FREE_ROOMS, AppTab.TASKS, AppTab.OTHER)
                     val previousDefault = listOf(AppTab.SCHEDULE, AppTab.TASKS, AppTab.OTHER)
-                    if (loaded == legacyDefault || loaded == previousDefault) {
+                    if (loaded == previousDefault) {
                         _dockTabs.value = DEFAULT_DOCK_TABS
                     } else {
                         _dockTabs.value = sanitizeDockTabs(loaded)
@@ -510,7 +509,7 @@ class ScheduleStorage(
         private const val KEY_CHEATS_AGREED = "dongau_cheats_agreed"
         private const val KEY_CHEATS_BLOCKED = "dongau_cheats_blocked"
         private const val KEY_BETA_CHANNEL = "dongau_beta_channel"
-        val DEFAULT_DOCK_TABS = listOf(AppTab.SCHEDULE, AppTab.TASKS, AppTab.FREE_ROOMS, AppTab.OTHER)
+        val DEFAULT_DOCK_TABS = listOf(AppTab.SCHEDULE, AppTab.TASKS, AppTab.OTHER)
     }
 }
 

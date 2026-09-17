@@ -37,7 +37,6 @@ __pycache__/
 *.egg-info/
 .venv/
 env/
-dist_free_rooms/
 dist_version/
 dist/
 dist_latest/

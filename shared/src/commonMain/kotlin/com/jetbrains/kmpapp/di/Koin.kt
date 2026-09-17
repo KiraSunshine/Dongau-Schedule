@@ -7,8 +7,6 @@ import com.jetbrains.kmpapp.data.storage.ScheduleStorage
 import com.jetbrains.kmpapp.data.update.AppUpdateChecker
 import com.jetbrains.kmpapp.screens.other.OtherViewModel
 import com.jetbrains.kmpapp.screens.schedule.ScheduleViewModel
-import com.jetbrains.kmpapp.data.FreeRoomsRepository
-import com.jetbrains.kmpapp.screens.rooms.FreeRoomsViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.ContentType
@@ -51,14 +49,12 @@ val dataModule = module {
     singleOf(::ScheduleStorage)
     singleOf(::ScheduleRepository)
     singleOf(::AppUpdateChecker)
-    singleOf(::FreeRoomsRepository)
     singleOf(::TaskRepository)
 }
 
 val viewModelModule = module {
     factoryOf(::ScheduleViewModel)
     factoryOf(::OtherViewModel)
-    factoryOf(::FreeRoomsViewModel)
     factoryOf(::TasksViewModel)
 }
 

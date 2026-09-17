@@ -113,17 +113,24 @@ class OtherViewModel(
         _storageStats.value = repository.getStorageStats()
     }
 
-    private val _contributors = MutableStateFlow<List<com.jetbrains.kmpapp.data.model.GitHubContributor>>(
-        listOf(
-            com.jetbrains.kmpapp.data.model.GitHubContributor(
-                login = "KiraSunshine",
-                htmlUrl = "https://github.com/KiraSunshine",
-                avatarUrl = "https://avatars.githubusercontent.com/KiraSunshine",
-                contributions = 1,
-                role = "Создатель и ведущий разработчик"
-            )
+    private val staticContributors = listOf(
+        com.jetbrains.kmpapp.data.model.GitHubContributor(
+            login = "KiraSunshine",
+            htmlUrl = "https://github.com/KiraSunshine",
+            avatarUrl = "https://avatars.githubusercontent.com/KiraSunshine",
+            contributions = 1,
+            role = "Создатель и ведущий разработчик"
+        ),
+        com.jetbrains.kmpapp.data.model.GitHubContributor(
+            login = "prosto-max",
+            htmlUrl = "https://github.com/prosto-max",
+            avatarUrl = "https://avatars.githubusercontent.com/prosto-max",
+            contributions = 1,
+            role = "Разработчик"
         )
     )
+
+    private val _contributors = MutableStateFlow(staticContributors)
     val contributors: StateFlow<List<com.jetbrains.kmpapp.data.model.GitHubContributor>> = _contributors.asStateFlow()
 
     private val _isLoadingContributors = MutableStateFlow(false)
@@ -134,17 +141,11 @@ class OtherViewModel(
             try {
                 _isLoadingContributors.value = true
                 val fetched = updateChecker.fetchContributors(forceRefresh = true)
-                val staticLead = com.jetbrains.kmpapp.data.model.GitHubContributor(
-                    login = "KiraSunshine",
-                    htmlUrl = "https://github.com/KiraSunshine",
-                    avatarUrl = "https://avatars.githubusercontent.com/KiraSunshine",
-                    contributions = 1,
-                    role = "Создатель и ведущий разработчик"
-                )
-                val otherContributors = fetched.filterNot {
-                    it.login.equals("KiraSunshine", ignoreCase = true)
+                val staticLogins = staticContributors.map { it.login }
+                val otherContributors = fetched.filterNot { contributor ->
+                    staticLogins.any { it.equals(contributor.login, ignoreCase = true) }
                 }
-                _contributors.value = listOf(staticLead) + otherContributors
+                _contributors.value = staticContributors + otherContributors
             } catch (t: Throwable) {
                 println("Failed to load contributors: ${t.message}")
             } finally {
