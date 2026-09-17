@@ -12,13 +12,6 @@ object DebugConfig {
         _isOfflineSimulated.value = enabled
     }
 
-    private val _isMapCoordinatePlaneEnabled = MutableStateFlow(false)
-    val isMapCoordinatePlaneEnabled: StateFlow<Boolean> = _isMapCoordinatePlaneEnabled.asStateFlow()
-
-    fun setMapCoordinatePlaneEnabled(enabled: Boolean) {
-        _isMapCoordinatePlaneEnabled.value = enabled
-    }
-
     fun reset() {
         _isOfflineSimulated.value = false
     }

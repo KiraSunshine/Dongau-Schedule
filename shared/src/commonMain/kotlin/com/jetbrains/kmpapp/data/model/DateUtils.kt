@@ -19,19 +19,14 @@ object DateUtils {
     }
 
     fun getWeekDates(anchorDate: LocalDate): List<LocalDate> {
-        val dayOfWeekIndex = when (anchorDate.dayOfWeek) {
-            DayOfWeek.MONDAY -> 0
-            DayOfWeek.TUESDAY -> 1
-            DayOfWeek.WEDNESDAY -> 2
-            DayOfWeek.THURSDAY -> 3
-            DayOfWeek.FRIDAY -> 4
-            DayOfWeek.SATURDAY -> 5
-            DayOfWeek.SUNDAY -> 6
-        }
-        val monday = anchorDate.minus(DatePeriod(days = dayOfWeekIndex))
+        val monday = startOfWeek(anchorDate)
         return (0..6).map { monday.plus(DatePeriod(days = it)) }
     }
 
+    /**
+     * Первая неделя семестра — неделя (Пн–Вс), в которую попадает 1 сентября.
+     * Номер недели считается по понедельникам, поэтому внутри недели не меняется.
+     */
     fun getWeekInfo(date: LocalDate): SemesterWeekInfo {
         val monthNum = date.month.ordinal + 1
         val semesterStart = if (monthNum in 2..8) {
@@ -41,14 +36,29 @@ object DateUtils {
             LocalDate(startYear, 9, 1)
         }
 
-        val daysBetween = semesterStart.daysUntil(date)
-        val weekNumber = if (daysBetween >= 0) (daysBetween / 7) + 1 else 1
+        val firstWeekMonday = startOfWeek(semesterStart)
+        val currentWeekMonday = startOfWeek(date)
+        val weeksBetween = firstWeekMonday.daysUntil(currentWeekMonday) / 7
+        val weekNumber = (weeksBetween + 1).coerceAtLeast(1)
         val isEven = weekNumber % 2 == 0
 
         return SemesterWeekInfo(
-            weekNumber = weekNumber.coerceAtLeast(1),
+            weekNumber = weekNumber,
             isEven = isEven
         )
+    }
+
+    private fun startOfWeek(date: LocalDate): LocalDate {
+        val dayOfWeekIndex = when (date.dayOfWeek) {
+            DayOfWeek.MONDAY -> 0
+            DayOfWeek.TUESDAY -> 1
+            DayOfWeek.WEDNESDAY -> 2
+            DayOfWeek.THURSDAY -> 3
+            DayOfWeek.FRIDAY -> 4
+            DayOfWeek.SATURDAY -> 5
+            DayOfWeek.SUNDAY -> 6
+        }
+        return date.minus(DatePeriod(days = dayOfWeekIndex))
     }
 
     fun formatDayOfWeekShort(dayOfWeek: DayOfWeek): String {

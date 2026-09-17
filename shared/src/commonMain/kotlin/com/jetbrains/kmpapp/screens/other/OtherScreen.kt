@@ -262,7 +262,7 @@ private fun OtherMainContent(
             // 1. University resources card
             OtherNavCard(
                 title = "Ресурсы университета",
-                subtitle = "Личный кабинет, СДО, Пульс и сервисы",
+                subtitle = "Портал, Расписание и Официальный сайт",
                 icon = Icons.Default.School,
                 onClick = { onNavigate(OtherSubScreen.RESOURCES) }
             )
