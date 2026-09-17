@@ -125,7 +125,7 @@ class OtherViewModel(
             htmlUrl = "https://github.com/prosto-max",
             avatarUrl = "https://avatars.githubusercontent.com/prosto-max",
             contributions = 1,
-            role = "Разработчик"
+            role = "Разработчик Mirea-Schedule"
         )
     )
 
