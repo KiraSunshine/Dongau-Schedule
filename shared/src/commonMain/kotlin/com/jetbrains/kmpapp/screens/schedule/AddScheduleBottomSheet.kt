@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,10 +55,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
-import com.jetbrains.kmpapp.data.model.ScheduleTargetType
 import com.jetbrains.kmpapp.screens.other.OtherViewModel
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import kotlinx.coroutines.delay
@@ -76,7 +72,6 @@ fun AddScheduleBottomSheet(
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<ScheduleTarget>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    var selectedFilter by remember { mutableStateOf<ScheduleTargetType?>(null) }
     var showCyberpunkDialog by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
@@ -91,11 +86,6 @@ fun AddScheduleBottomSheet(
             results = emptyList()
             isLoading = false
         }
-    }
-
-    val filteredResults = remember(results, selectedFilter) {
-        if (selectedFilter == null) results
-        else results.filter { it.type == selectedFilter }
     }
 
     ModalBottomSheet(
@@ -147,7 +137,7 @@ fun AddScheduleBottomSheet(
                 },
                 placeholder = {
                     Text(
-                        text = "Группа, преподаватель, аудитория",
+                        text = "Группа",
                         fontSize = 13.5.sp,
                         maxLines = 1
                     )
@@ -174,30 +164,6 @@ fun AddScheduleBottomSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Target type filter chips (horizontally scrollable so all chips fit on any screen)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(
-                    null to "Все",
-                    ScheduleTargetType.GROUP to "Группы",
-                    ScheduleTargetType.TEACHER to "Преподаватели",
-                    ScheduleTargetType.AUDITORIUM to "Аудитории"
-                ).forEach { (type, title) ->
-                    FilterChip(
-                        selected = selectedFilter == type,
-                        onClick = { selectedFilter = type },
-                        label = { Text(title, fontSize = 12.sp) },
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
             // Results / Loading
             Box(
                 modifier = Modifier
@@ -211,7 +177,7 @@ fun AddScheduleBottomSheet(
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(36.dp))
                     }
-                } else if (filteredResults.isEmpty() && query.trim().isNotEmpty()) {
+                } else if (results.isEmpty() && query.trim().isNotEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -227,7 +193,7 @@ fun AddScheduleBottomSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Введите название группы, преподавателя или аудитории для поиска",
+                            text = "Введите название группы для поиска",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 14.sp,
                             textAlign = TextAlign.Center
@@ -238,7 +204,7 @@ fun AddScheduleBottomSheet(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(filteredResults, key = { "${it.type}_${it.id}" }) { item ->
+                        items(results, key = { "${it.type}_${it.id}" }) { item ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
