@@ -1315,7 +1315,7 @@ private fun SubjectEditModalSheet(
             OutlinedTextField(
                 value = room,
                 onValueChange = { room = it },
-                label = { Text("Аудитория или ссылка на СДО") },
+                label = { Text("Аудитория или ссылка") },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()

@@ -1,7 +1,6 @@
 package com.jetbrains.kmpapp.screens.other
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,7 +37,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,7 +59,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
-import com.jetbrains.kmpapp.data.model.ScheduleTargetType
 import com.jetbrains.kmpapp.screens.components.PlatformBackHandler
 import com.jetbrains.kmpapp.screens.components.swipeToDismissBack
 import com.jetbrains.kmpapp.screens.schedule.AddScheduleBottomSheet
@@ -82,7 +78,6 @@ fun ManageSchedulesScreen(
     val filteredTargets by viewModel.filteredSavedTargets.collectAsState()
     val selectedTarget by viewModel.selectedTarget.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val filterType by viewModel.filterType.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
 
     var showAddSheet by remember { mutableStateOf(false) }
@@ -239,29 +234,6 @@ fun ManageSchedulesScreen(
                                 )
                             }
                         }
-                    }
-                }
-
-                // Filter chips
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(
-                        null to "Все",
-                        ScheduleTargetType.GROUP to "Группы",
-                        ScheduleTargetType.TEACHER to "Преподаватели",
-                        ScheduleTargetType.AUDITORIUM to "Аудитории"
-                    ).forEach { (type, title) ->
-                        FilterChip(
-                            selected = filterType == type,
-                            onClick = { viewModel.setFilterType(type) },
-                            label = { Text(title, fontSize = 12.sp) },
-                            shape = RoundedCornerShape(12.dp)
-                        )
                     }
                 }
 

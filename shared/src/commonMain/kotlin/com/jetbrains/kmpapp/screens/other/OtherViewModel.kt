@@ -6,7 +6,6 @@ import com.jetbrains.kmpapp.data.ScheduleRepository
 import com.jetbrains.kmpapp.data.TaskRepository
 import com.jetbrains.kmpapp.data.DebugConfig
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
-import com.jetbrains.kmpapp.data.model.ScheduleTargetType
 import com.jetbrains.kmpapp.data.model.StorageStats
 import com.jetbrains.kmpapp.data.model.ThemeMode
 import com.jetbrains.kmpapp.theme.ThemeOverlay
@@ -180,22 +179,15 @@ class OtherViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _filterType = MutableStateFlow<ScheduleTargetType?>(null)
-    val filterType: StateFlow<ScheduleTargetType?> = _filterType.asStateFlow()
-
     private val _sortOrder = MutableStateFlow(TargetSortOrder.TITLE_ASC)
     val sortOrder: StateFlow<TargetSortOrder> = _sortOrder.asStateFlow()
 
     val filteredSavedTargets: StateFlow<List<ScheduleTarget>> = combine(
         repository.savedTargets,
         _searchQuery,
-        _filterType,
         _sortOrder
-    ) { list, query, filter, sort ->
+    ) { list, query, sort ->
         var result = list
-        if (filter != null) {
-            result = result.filter { it.type == filter }
-        }
         val trimmed = query.trim()
         if (trimmed.isNotEmpty()) {
             result = result.filter {
@@ -213,10 +205,6 @@ class OtherViewModel(
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
-    }
-
-    fun setFilterType(type: ScheduleTargetType?) {
-        _filterType.value = type
     }
 
     fun setSortOrder(order: TargetSortOrder) {
