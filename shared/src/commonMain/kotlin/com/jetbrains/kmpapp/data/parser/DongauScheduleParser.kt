@@ -40,7 +40,18 @@ object DongauScheduleParser {
         } else {
             templates.map { it.lesson }
         }
-        return lessons.sortedWith(compareBy({ it.date }, { it.bellNumber }))
+
+        // Если в ответе есть сессионные экзамены/зачёты (тип недели сессии, >2), то однотипные
+        // записи с обычной чётностью (1/2) — это внутрисеместровые отметки, которых нет в
+        // расписании сессии (Rasp.aspx). Их скрываем, чтобы не было расхождений.
+        val hasSessionExam = lessons.any { it.lessonType in EXAM_LIKE_TYPES && it.weekType > 2 }
+        val filtered = if (hasSessionExam) {
+            lessons.filterNot { it.lessonType in EXAM_LIKE_TYPES && it.weekType in 1..2 }
+        } else {
+            lessons
+        }
+
+        return filtered.sortedWith(compareBy({ it.date }, { it.bellNumber }))
     }
 
     private fun parseTemplate(item: DongauScheduleItem): ParsedTemplate? {
@@ -150,7 +161,8 @@ object DongauScheduleParser {
             endTime = endTime,
             date = date,
             groups = groups,
-            isReplacement = item.isReplacement
+            isReplacement = item.isReplacement,
+            weekType = item.weekType
         )
     }
 

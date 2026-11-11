@@ -92,7 +92,8 @@ data class Lesson(
     val endTime: String,
     val date: LocalDate,
     val groups: List<String> = emptyList(),
-    val isReplacement: Boolean = false
+    val isReplacement: Boolean = false,
+    val weekType: Int = 0
 )
 
 data class DaySchedule(
