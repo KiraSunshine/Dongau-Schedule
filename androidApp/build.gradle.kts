@@ -23,9 +23,9 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = (project.findProperty("buildNumber") as? String)?.toIntOrNull()
             ?: System.getenv("BUILD_NUMBER")?.toIntOrNull()
-            ?: 36
+            ?: 37
         // CI подставляет версию канала через tools/versioning.py; в репо — базовая версия линии разработки
-        versionName = "26.0.8"
+        versionName = "26.0.9"
     }
     signingConfigs {
         create("sharedDebug") {

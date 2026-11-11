@@ -1,6 +1,7 @@
 package com.jetbrains.kmpapp.data
 
 import com.jetbrains.kmpapp.data.api.DongauScheduleApi
+import com.jetbrains.kmpapp.data.model.AttendanceRule
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.LessonDiffItem
 import com.jetbrains.kmpapp.data.model.LessonDiffType
@@ -83,6 +84,14 @@ class ScheduleRepository(
     fun setAutoScrollToCurrentLesson(enabled: Boolean) {
         storage.setAutoScrollToCurrentLesson(enabled)
     }
+
+    val attendanceRules: StateFlow<List<AttendanceRule>> = storage.attendanceRules
+
+    fun setAttendanceRule(rule: AttendanceRule) = storage.setAttendanceRule(rule)
+
+    fun clearAttendanceRule(lesson: Lesson) = storage.clearAttendanceRule(lesson)
+
+    fun resetAttendanceRules() = storage.resetAttendanceRules()
 
     fun setThemeMode(mode: ThemeMode) {
         storage.setThemeMode(mode)
@@ -186,6 +195,35 @@ class ScheduleRepository(
             val response = api.getSchedule(target.type, target.id)
             val parsedLessons = DongauScheduleParser.parse(response)
             val oldLessons = storage.getLessons(target.id)
+            val hasCachedLessons = oldLessons != null && oldLessons.isNotEmpty()
+
+            // Сайт ДонГАУ иногда отдаёт пустой список (например, во время обновления
+            // расписания). Не затираем последнее известное расписание в этом случае.
+            if (parsedLessons.isEmpty() && hasCachedLessons) {
+                storage.setLastSyncTime(target.id, Clock.System.now().toEpochMilliseconds())
+                _errorMessage.value = null
+                if (!silent) {
+                    _refreshStatus.value = com.jetbrains.kmpapp.data.model.RefreshStatus.Success(
+                        message = "Сайт вернул пустое расписание — показаны сохранённые данные"
+                    )
+                }
+                return
+            }
+
+            // Если расписания нет и в кэше — показываем понятную ошибку,
+            // а не «На этот день пар нет» на каждом дне.
+            if (parsedLessons.isEmpty()) {
+                _errorMessage.value =
+                    "Сайт ДонГАУ не отдаёт расписание для этой группы (пустой ответ). Попробуйте позже."
+                if (!silent) {
+                    _refreshStatus.value = com.jetbrains.kmpapp.data.model.RefreshStatus.Error(
+                        com.jetbrains.kmpapp.data.model.AppErrorCode.ERR_NOT_FOUND,
+                        message = "Сайт вернул пустое расписание"
+                    )
+                }
+                return
+            }
+
             storage.saveLessons(target.id, parsedLessons)
             val now = Clock.System.now().toEpochMilliseconds()
             storage.setLastSyncTime(target.id, now)
@@ -194,7 +232,7 @@ class ScheduleRepository(
                 _refreshStatus.value = com.jetbrains.kmpapp.data.model.RefreshStatus.Success()
             }
 
-            if (oldLessons != null && oldLessons.isNotEmpty()) {
+            if (hasCachedLessons) {
                 val diff = computeDiff(oldLessons, parsedLessons, target)
                 if (diff != null) {
                     _activeDiff.value = diff

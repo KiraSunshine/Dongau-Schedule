@@ -3,11 +3,14 @@ package com.jetbrains.kmpapp.screens.schedule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jetbrains.kmpapp.data.ScheduleRepository
+import com.jetbrains.kmpapp.data.model.AttendanceRule
+import com.jetbrains.kmpapp.data.model.AttendanceStatus
 import com.jetbrains.kmpapp.data.model.DateUtils
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.ScheduleSlot
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
 import com.jetbrains.kmpapp.data.model.defaultBells
+import com.jetbrains.kmpapp.data.model.seriesKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +36,7 @@ class ScheduleViewModel(
     val showLessonProgress: StateFlow<Boolean> = repository.showLessonProgress
     val autoScrollToCurrentLesson: StateFlow<Boolean> = repository.autoScrollToCurrentLesson
     val showAbbreviatedNames: StateFlow<Boolean> = repository.showAbbreviatedNames
+    val attendanceRules: StateFlow<List<AttendanceRule>> = repository.attendanceRules
 
     private var lastAutoScrolledDate: LocalDate? = null
     private var lastAutoScrolledTargetId: Int? = null
@@ -173,6 +177,25 @@ class ScheduleViewModel(
 
     fun selectLessonForDetail(lesson: Lesson?) {
         _selectedLessonForDetail.value = lesson
+    }
+
+    fun setAttendance(lesson: Lesson, status: AttendanceStatus, intervalWeeks: Int) {
+        repository.setAttendanceRule(
+            AttendanceRule(
+                seriesKey = lesson.seriesKey(),
+                status = status,
+                anchorDate = lesson.date,
+                intervalWeeks = intervalWeeks,
+                subject = lesson.subject,
+                teacher = lesson.teachers.joinToString(", "),
+                bellNumber = lesson.bellNumber,
+                dayOfWeek = lesson.date.dayOfWeek.ordinal
+            )
+        )
+    }
+
+    fun clearAttendance(lesson: Lesson) {
+        repository.clearAttendanceRule(lesson)
     }
 
     fun selectTarget(target: ScheduleTarget) {
