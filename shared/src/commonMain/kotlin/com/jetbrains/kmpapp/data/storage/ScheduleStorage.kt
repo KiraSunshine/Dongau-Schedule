@@ -1,10 +1,8 @@
 package com.jetbrains.kmpapp.data.storage
 
-import com.jetbrains.kmpapp.data.model.AttendanceRule
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
 import com.jetbrains.kmpapp.data.model.ThemeMode
-import com.jetbrains.kmpapp.data.model.seriesKey
 import com.jetbrains.kmpapp.screens.components.AppTab
 import com.jetbrains.kmpapp.theme.ThemeOverlay
 import kotlinx.coroutines.CoroutineScope
@@ -50,9 +48,6 @@ class ScheduleStorage(
 
     private val _showAbbreviatedNames = MutableStateFlow<Boolean>(false)
     val showAbbreviatedNames: StateFlow<Boolean> = _showAbbreviatedNames.asStateFlow()
-
-    private val _attendanceRules = MutableStateFlow<List<AttendanceRule>>(emptyList())
-    val attendanceRules: StateFlow<List<AttendanceRule>> = _attendanceRules.asStateFlow()
 
     private val _themeMode = MutableStateFlow<ThemeMode>(ThemeMode.SYSTEM)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
@@ -126,18 +121,6 @@ class ScheduleStorage(
                 val showAbbreviatedStr = platformStorage.getString(KEY_SHOW_ABBREVIATED_NAMES)
                 if (!showAbbreviatedStr.isNullOrBlank()) {
                     _showAbbreviatedNames.value = showAbbreviatedStr.toBooleanStrictOrNull() ?: false
-                }
-            } catch (_: Throwable) {}
-
-            // Restore attendance rules
-            try {
-                val rulesJson = platformStorage.getString(KEY_ATTENDANCE_RULES)
-                if (!rulesJson.isNullOrBlank()) {
-                    _attendanceRules.value = try {
-                        json.decodeFromString<List<AttendanceRule>>(rulesJson)
-                    } catch (_: Throwable) {
-                        emptyList()
-                    }
                 }
             } catch (_: Throwable) {}
 
@@ -261,46 +244,6 @@ class ScheduleStorage(
                 platformStorage.saveString(KEY_SHOW_ABBREVIATED_NAMES, enabled.toString())
             } catch (e: Exception) {
                 println("Failed to persist showAbbreviatedNames: ${e.message}")
-            }
-        }
-    }
-
-    /**
-     * Сохраняет отметку посещаемости для серии занятий.
-     * Старые правила этой же серии заменяются новым.
-     */
-    fun setAttendanceRule(rule: AttendanceRule) {
-        _attendanceRules.update { current ->
-            current.filterNot { it.seriesKey == rule.seriesKey } + rule
-        }
-        persistAttendanceRules()
-    }
-
-    /** Убирает все отметки для серии занятия. */
-    fun clearAttendanceRule(lesson: Lesson) {
-        val key = lesson.seriesKey()
-        _attendanceRules.update { current -> current.filterNot { it.seriesKey == key } }
-        persistAttendanceRules()
-    }
-
-    fun resetAttendanceRules() {
-        _attendanceRules.value = emptyList()
-        scope.launch {
-            try {
-                platformStorage.remove(KEY_ATTENDANCE_RULES)
-            } catch (_: Throwable) {}
-        }
-    }
-
-    private fun persistAttendanceRules() {
-        scope.launch {
-            try {
-                platformStorage.saveString(
-                    KEY_ATTENDANCE_RULES,
-                    json.encodeToString(_attendanceRules.value)
-                )
-            } catch (e: Exception) {
-                println("Failed to persist attendance rules: ${e.message}")
             }
         }
     }
@@ -476,7 +419,6 @@ class ScheduleStorage(
         _showLessonProgress.value = true
         _autoScrollToCurrentLesson.value = true
         _showAbbreviatedNames.value = false
-        _attendanceRules.value = emptyList()
         _themeMode.value = ThemeMode.SYSTEM
         _dockTabs.value = DEFAULT_DOCK_TABS
         _themeOverlay.value = ThemeOverlay.NONE
@@ -559,7 +501,6 @@ class ScheduleStorage(
         private const val KEY_SHOW_LESSON_PROGRESS = "dongau_show_lesson_progress"
         private const val KEY_AUTO_SCROLL_CURRENT_LESSON = "dongau_auto_scroll_current_lesson"
         private const val KEY_SHOW_ABBREVIATED_NAMES = "dongau_show_abbreviated_names"
-        private const val KEY_ATTENDANCE_RULES = "dongau_attendance_rules"
         private const val KEY_APP_THEME = "dongau_app_theme"
         private const val KEY_DOCK_TABS = "dongau_dock_tabs_order"
         private const val KEY_SAKURA_THEME = "dongau_sakura_theme_secret"

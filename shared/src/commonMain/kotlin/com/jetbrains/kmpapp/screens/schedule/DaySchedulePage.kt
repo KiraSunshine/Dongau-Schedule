@@ -1,14 +1,11 @@
 package com.jetbrains.kmpapp.screens.schedule
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
@@ -22,12 +19,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.jetbrains.kmpapp.data.model.AttendanceRule
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.ScheduleSlot
 import com.jetbrains.kmpapp.data.model.ScheduleTargetType
@@ -35,9 +30,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.LocalDate
-import kmp_app_template.shared.generated.resources.Res
-import kmp_app_template.shared.generated.resources.borzoi
-import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun DaySchedulePage(
@@ -54,8 +46,6 @@ internal fun DaySchedulePage(
     markAutoScrolled: (LocalDate) -> Unit,
     onRetry: () -> Unit,
     onLessonClick: (Lesson) -> Unit,
-    attendanceRules: List<AttendanceRule> = emptyList(),
-    onAttendanceClick: (Lesson) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(date, slots, autoScrollToCurrentLesson) {
@@ -154,15 +144,8 @@ internal fun DaySchedulePage(
                     Spacer(modifier = Modifier.height(12.dp))
                     IconButton(onClick = onRetry) { Icon(Icons.Default.Refresh, contentDescription = "Повторить") }
                 } else {
-                    Image(
-                        painter = painterResource(Res.drawable.borzoi),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(170.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("🎉", fontSize = 48.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text("На этот день пар нет", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Отличный повод отдохнуть!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -193,9 +176,7 @@ internal fun DaySchedulePage(
                     currentMinutes = currentMinutes,
                     showLessonProgress = showLessonProgress,
                     showAbbreviatedNames = showAbbreviatedNames,
-                    scheduleTargetType = scheduleTargetType,
-                    attendanceRules = attendanceRules,
-                    onAttendanceClick = onAttendanceClick
+                    scheduleTargetType = scheduleTargetType
                 )
             }
         }

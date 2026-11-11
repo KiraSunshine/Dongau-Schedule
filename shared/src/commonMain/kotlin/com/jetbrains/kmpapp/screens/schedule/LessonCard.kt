@@ -19,8 +19,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.LocationOn
@@ -28,14 +26,12 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -43,13 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.jetbrains.kmpapp.data.model.AttendanceRule
-import com.jetbrains.kmpapp.data.model.AttendanceStatus
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.LessonType
 import com.jetbrains.kmpapp.data.model.ScheduleSlot
 import com.jetbrains.kmpapp.data.model.ScheduleTargetType
-import com.jetbrains.kmpapp.data.model.statusFor
 
 @Composable
 fun ScheduleSlotCard(
@@ -60,24 +53,19 @@ fun ScheduleSlotCard(
     showLessonProgress: Boolean = true,
     showAbbreviatedNames: Boolean = false,
     scheduleTargetType: ScheduleTargetType = ScheduleTargetType.GROUP,
-    attendanceRules: List<AttendanceRule> = emptyList(),
-    onAttendanceClick: (Lesson) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     when (slot) {
         is ScheduleSlot.Active -> {
             if (slot.lessons.size == 1) {
-                val lesson = slot.lessons.first()
                 LessonCard(
-                    lesson = lesson,
-                    onClick = { onLessonClick(lesson) },
+                    lesson = slot.lessons.first(),
+                    onClick = { onLessonClick(slot.lessons.first()) },
                     isToday = isToday,
                     currentMinutes = currentMinutes,
                     showLessonProgress = showLessonProgress,
                     showAbbreviatedNames = showAbbreviatedNames,
                     scheduleTargetType = scheduleTargetType,
-                    attendanceStatus = attendanceRules.statusFor(lesson),
-                    onAttendanceClick = { onAttendanceClick(lesson) },
                     modifier = modifier
                 )
             } else {
@@ -92,8 +80,6 @@ fun ScheduleSlotCard(
                     showLessonProgress = showLessonProgress,
                     showAbbreviatedNames = showAbbreviatedNames,
                     scheduleTargetType = scheduleTargetType,
-                    attendanceRules = attendanceRules,
-                    onAttendanceClick = onAttendanceClick,
                     modifier = modifier
                 )
             }
@@ -118,8 +104,6 @@ fun LessonCard(
     showLessonProgress: Boolean = true,
     showAbbreviatedNames: Boolean = false,
     scheduleTargetType: ScheduleTargetType = ScheduleTargetType.GROUP,
-    attendanceStatus: AttendanceStatus? = null,
-    onAttendanceClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     pageIndicator: Pair<Int, Int>? = null,
     horizontalMargin: androidx.compose.ui.unit.Dp = 16.dp
@@ -129,9 +113,6 @@ fun LessonCard(
     val cardOnBgDim = Color.White.copy(alpha = 0.7f)
     val cardOnBgSubtle = Color.White.copy(alpha = 0.45f)
 
-    val isSkipped = attendanceStatus == AttendanceStatus.SKIPPED
-    val cardAlpha = if (isSkipped) 0.3f else 1f
-
     val progress = if (isToday && showLessonProgress) {
         com.jetbrains.kmpapp.data.model.DateUtils.getLessonProgress(lesson.startTime, lesson.endTime, currentMinutes)
     } else null
@@ -139,7 +120,6 @@ fun LessonCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(cardAlpha)
             .padding(horizontal = horizontalMargin, vertical = 6.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = typeBg, contentColor = cardOnBg),
@@ -203,33 +183,6 @@ fun LessonCard(
                                 fontWeight = FontWeight.Bold,
                                 color = cardOnBg
                             )
-                        }
-
-                        if (onAttendanceClick != null) {
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.2f))
-                                    .clickable(onClick = onAttendanceClick),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (attendanceStatus == AttendanceStatus.SKIPPED) {
-                                        Icons.Default.Close
-                                    } else {
-                                        Icons.Default.Check
-                                    },
-                                    contentDescription = "Отметить посещаемость",
-                                    tint = if (attendanceStatus == null) {
-                                        Color.White.copy(alpha = 0.55f)
-                                    } else {
-                                        Color.White
-                                    },
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
                         }
                     }
                 }
@@ -416,8 +369,6 @@ fun MultiLessonCard(
     showLessonProgress: Boolean = true,
     showAbbreviatedNames: Boolean = false,
     scheduleTargetType: ScheduleTargetType = ScheduleTargetType.GROUP,
-    attendanceRules: List<AttendanceRule> = emptyList(),
-    onAttendanceClick: (Lesson) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val pagerState = rememberPagerState(pageCount = { lessons.size })
@@ -438,8 +389,6 @@ fun MultiLessonCard(
             showLessonProgress = showLessonProgress,
             showAbbreviatedNames = showAbbreviatedNames,
             scheduleTargetType = scheduleTargetType,
-            attendanceStatus = attendanceRules.statusFor(lessons[page]),
-            onAttendanceClick = { onAttendanceClick(lessons[page]) },
             pageIndicator = lessons.size to pagerState.currentPage,
             horizontalMargin = 0.dp
         )

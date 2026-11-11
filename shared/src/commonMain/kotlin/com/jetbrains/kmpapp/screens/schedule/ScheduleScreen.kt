@@ -59,8 +59,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jetbrains.kmpapp.data.model.ScheduleSlot
-import com.jetbrains.kmpapp.data.model.AttendanceStatus
-import com.jetbrains.kmpapp.data.model.seriesKey
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -124,16 +122,12 @@ private fun ScheduleMainContent(
     val autoScrollToCurrentLesson by viewModel.autoScrollToCurrentLesson.collectAsState()
     val showAbbreviatedNames by viewModel.showAbbreviatedNames.collectAsState()
     val currentMinutes by viewModel.currentMinutes.collectAsState()
-    val attendanceRules by viewModel.attendanceRules.collectAsState()
 
     var showAddSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var showDiffSheet by remember { mutableStateOf(false) }
     val diffSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    var attendanceLesson by remember { mutableStateOf<com.jetbrains.kmpapp.data.model.Lesson?>(null) }
-    val attendanceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val scope = rememberCoroutineScope()
     val isToday = selectedDate == com.jetbrains.kmpapp.data.model.DateUtils.today()
@@ -274,8 +268,6 @@ private fun ScheduleMainContent(
                                 markAutoScrolled = { viewModel.markAutoScrolled(it, selectedTarget?.id) },
                                 onRetry = { viewModel.refresh() },
                                 onLessonClick = { viewModel.selectLessonForDetail(it) },
-                                attendanceRules = attendanceRules,
-                                onAttendanceClick = { attendanceLesson = it },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -365,33 +357,6 @@ private fun ScheduleMainContent(
                 viewModel.dismissDiff()
                 scope.launch { diffSheetState.hide() }.invokeOnCompletion {
                     showDiffSheet = false
-                }
-            }
-        )
-    }
-
-    attendanceLesson?.let { lesson ->
-        val existingRule = attendanceRules.firstOrNull { it.seriesKey == lesson.seriesKey() }
-        AttendanceBottomSheet(
-            lesson = lesson,
-            currentStatus = existingRule?.status,
-            currentIntervalWeeks = existingRule?.intervalWeeks ?: 0,
-            sheetState = attendanceSheetState,
-            onDismiss = {
-                scope.launch { attendanceSheetState.hide() }.invokeOnCompletion {
-                    attendanceLesson = null
-                }
-            },
-            onApply = { status, weeks ->
-                viewModel.setAttendance(lesson, status, weeks)
-                scope.launch { attendanceSheetState.hide() }.invokeOnCompletion {
-                    attendanceLesson = null
-                }
-            },
-            onReset = {
-                viewModel.clearAttendance(lesson)
-                scope.launch { attendanceSheetState.hide() }.invokeOnCompletion {
-                    attendanceLesson = null
                 }
             }
         )

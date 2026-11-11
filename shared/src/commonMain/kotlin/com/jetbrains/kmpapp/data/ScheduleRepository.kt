@@ -1,7 +1,6 @@
 package com.jetbrains.kmpapp.data
 
 import com.jetbrains.kmpapp.data.api.DongauScheduleApi
-import com.jetbrains.kmpapp.data.model.AttendanceRule
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.LessonDiffItem
 import com.jetbrains.kmpapp.data.model.LessonDiffType
@@ -84,14 +83,6 @@ class ScheduleRepository(
     fun setAutoScrollToCurrentLesson(enabled: Boolean) {
         storage.setAutoScrollToCurrentLesson(enabled)
     }
-
-    val attendanceRules: StateFlow<List<AttendanceRule>> = storage.attendanceRules
-
-    fun setAttendanceRule(rule: AttendanceRule) = storage.setAttendanceRule(rule)
-
-    fun clearAttendanceRule(lesson: Lesson) = storage.clearAttendanceRule(lesson)
-
-    fun resetAttendanceRules() = storage.resetAttendanceRules()
 
     fun setThemeMode(mode: ThemeMode) {
         storage.setThemeMode(mode)
