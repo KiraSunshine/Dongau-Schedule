@@ -2,6 +2,7 @@ package com.jetbrains.kmpapp.data
 
 import com.jetbrains.kmpapp.data.api.DongauScheduleApi
 import com.jetbrains.kmpapp.data.model.AttendanceRule
+import com.jetbrains.kmpapp.data.model.DateUtils
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.LessonDiffItem
 import com.jetbrains.kmpapp.data.model.LessonDiffType
@@ -194,8 +195,9 @@ class ScheduleRepository(
         try {
             val response = api.getSchedule(target.type, target.id)
             val parsedLessons = DongauScheduleParser.parse(response)
-            val oldLessons = storage.getLessons(target.id)
-            val hasCachedLessons = oldLessons != null && oldLessons.isNotEmpty()
+            val oldLessons = storage.getLessons(target.id).orEmpty()
+            val hasCachedLessons = oldLessons.isNotEmpty()
+            val today = DateUtils.today()
 
             // Сайт ДонГАУ иногда отдаёт пустой список (например, во время обновления
             // расписания). Не затираем последнее известное расписание в этом случае.
@@ -224,7 +226,13 @@ class ScheduleRepository(
                 return
             }
 
-            storage.saveLessons(target.id, parsedLessons)
+            // Прошедшие дни (< today) сохраняем как историю и не даём серверу их затирать.
+            // На сегодня и будущее доверяем серверу (актуальные пары, переносы, сессия/экзамены).
+            val preservedPast = oldLessons.filter { it.date < today }
+            val serverCurrent = parsedLessons.filter { it.date >= today }
+            val mergedLessons = (preservedPast + serverCurrent).distinctBy { it.id }
+
+            storage.saveLessons(target.id, mergedLessons)
             val now = Clock.System.now().toEpochMilliseconds()
             storage.setLastSyncTime(target.id, now)
             _errorMessage.value = null
@@ -233,7 +241,11 @@ class ScheduleRepository(
             }
 
             if (hasCachedLessons) {
-                val diff = computeDiff(oldLessons, parsedLessons, target)
+                val diff = computeDiff(
+                    oldLessons.filter { it.date >= today },
+                    serverCurrent,
+                    target
+                )
                 if (diff != null) {
                     _activeDiff.value = diff
                 }
