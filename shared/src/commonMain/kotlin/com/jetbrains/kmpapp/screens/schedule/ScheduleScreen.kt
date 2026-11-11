@@ -126,6 +126,10 @@ private fun ScheduleMainContent(
     val currentMinutes by viewModel.currentMinutes.collectAsState()
     val attendanceRules by viewModel.attendanceRules.collectAsState()
 
+    val sortedLessonDates = remember(currentLessons) {
+        currentLessons.map { it.date }.distinct().sorted()
+    }
+
     var showAddSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -241,13 +245,6 @@ private fun ScheduleMainContent(
                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                 )
 
-                Text(
-                    text = "diag: id=${selectedTarget?.id} lessons=${currentLessons.size} date=$selectedDate err=${errorMessage ?: "-"}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-
                 PullToRefreshBox(
                     isRefreshing = isLoading,
                     onRefresh = { viewModel.refresh() },
@@ -265,6 +262,7 @@ private fun ScheduleMainContent(
                                 slots = pageSlots,
                                 listState = rememberLazyListState(),
                                 errorMessage = errorMessage,
+                                nextLessonDate = sortedLessonDates.firstOrNull { it > pageDate },
                                 currentMinutes = currentMinutes,
                                 showLessonProgress = showLessonProgress,
                                 showAbbreviatedNames = showAbbreviatedNames,

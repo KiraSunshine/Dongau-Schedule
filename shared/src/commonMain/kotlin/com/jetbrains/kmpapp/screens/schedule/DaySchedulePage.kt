@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -46,6 +47,7 @@ internal fun DaySchedulePage(
     slots: List<ScheduleSlot>,
     listState: LazyListState,
     errorMessage: String?,
+    nextLessonDate: LocalDate? = null,
     currentMinutes: Int,
     showLessonProgress: Boolean,
     showAbbreviatedNames: Boolean,
@@ -144,8 +146,14 @@ internal fun DaySchedulePage(
     }
 
     if (slots.isEmpty() || slots.all { it is ScheduleSlot.Empty && errorMessage != null }) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = modifier,
+            contentAlignment = if (errorMessage != null) Alignment.Center else Alignment.TopCenter
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = if (errorMessage == null) Modifier.padding(top = 24.dp) else Modifier
+            ) {
                 if (errorMessage != null) {
                     Text("⚠️", fontSize = 48.sp)
                     Spacer(modifier = Modifier.height(12.dp))
@@ -166,7 +174,14 @@ internal fun DaySchedulePage(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("На этот день пар нет", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Отличный повод отдохнуть!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = nextLessonDate?.let {
+                            "Ближайшие пары: ${it.day} ${com.jetbrains.kmpapp.data.model.DateUtils.formatMonthRu(it.month)}"
+                        } ?: "Выберите другой день",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
