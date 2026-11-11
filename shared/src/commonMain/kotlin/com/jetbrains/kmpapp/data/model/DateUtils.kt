@@ -19,27 +19,30 @@ object DateUtils {
     }
 
     fun getWeekDates(anchorDate: LocalDate): List<LocalDate> {
-        val dayOfWeekIndex = when (anchorDate.dayOfWeek) {
-            DayOfWeek.MONDAY -> 0
-            DayOfWeek.TUESDAY -> 1
-            DayOfWeek.WEDNESDAY -> 2
-            DayOfWeek.THURSDAY -> 3
-            DayOfWeek.FRIDAY -> 4
-            DayOfWeek.SATURDAY -> 5
-            DayOfWeek.SUNDAY -> 6
-        }
-        val monday = anchorDate.minus(DatePeriod(days = dayOfWeekIndex))
+        val monday = anchorDate.minus(DatePeriod(days = dayOfWeekIndex(anchorDate)))
         return (0..6).map { monday.plus(DatePeriod(days = it)) }
+    }
+
+    private fun dayOfWeekIndex(date: LocalDate): Int = when (date.dayOfWeek) {
+        DayOfWeek.MONDAY -> 0
+        DayOfWeek.TUESDAY -> 1
+        DayOfWeek.WEDNESDAY -> 2
+        DayOfWeek.THURSDAY -> 3
+        DayOfWeek.FRIDAY -> 4
+        DayOfWeek.SATURDAY -> 5
+        DayOfWeek.SUNDAY -> 6
     }
 
     fun getWeekInfo(date: LocalDate): SemesterWeekInfo {
         val monthNum = date.month.ordinal + 1
-        val semesterStart = if (monthNum in 2..8) {
+        val semesterStartDate = if (monthNum in 2..8) {
             LocalDate(date.year, 2, 9)
         } else {
             val startYear = if (monthNum == 1) date.year - 1 else date.year
             LocalDate(startYear, 9, 1)
         }
+        // Сайт считает недели с понедельника той недели, в которую попадает начало семестра.
+        val semesterStart = semesterStartDate.minus(DatePeriod(days = dayOfWeekIndex(semesterStartDate)))
 
         val daysBetween = semesterStart.daysUntil(date)
         val weekNumber = if (daysBetween >= 0) (daysBetween / 7) + 1 else 1
