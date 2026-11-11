@@ -517,6 +517,10 @@ internal fun getTypeBadgeColors(lessonType: LessonType): Pair<Color, Color> {
         LessonType.LECTURE -> Color(0xFF4CAF50) to Color.White
         LessonType.PRACTICE -> Color(0xFFFF9800) to Color.White
         LessonType.LAB -> Color(0xFF9C27B0) to Color.White
+        LessonType.EXAM -> Color(0xFFE53935) to Color.White
+        LessonType.CREDIT -> Color(0xFF1E88E5) to Color.White
+        LessonType.DIFF_CREDIT -> Color(0xFF00897B) to Color.White
+        LessonType.CONSULTATION -> Color(0xFF5C6BC0) to Color.White
         LessonType.OTHER -> Color(0xFF9E9E9E) to Color.White
     }
 }

@@ -19,11 +19,24 @@ object DongauScheduleParser {
         val weekType: Int
     )
 
+    private val EXAM_LIKE_TYPES = setOf(
+        LessonType.EXAM,
+        LessonType.CREDIT,
+        LessonType.DIFF_CREDIT,
+        LessonType.CONSULTATION
+    )
+
     fun parse(response: DongauScheduleResponse): List<Lesson> {
         val templates = response.rasp.mapNotNull { parseTemplate(it) }
         if (templates.isEmpty()) return emptyList()
         val lessons = if (response.isCyclical) {
-            expandCyclic(templates)
+            // Экзамены/зачёты/консультации и элементы с нетиповой неделей (>2) — разовые события на конкретную дату.
+            // Их не разворачиваем по чётности/нечётности на весь семестр.
+            val (single, recurring) = templates.partition {
+                it.lesson.lessonType in EXAM_LIKE_TYPES || it.weekType > 2
+            }
+            val expanded = if (recurring.isNotEmpty()) expandCyclic(recurring) else emptyList()
+            single.map { it.lesson } + expanded
         } else {
             templates.map { it.lesson }
         }
@@ -142,15 +155,37 @@ object DongauScheduleParser {
     }
 
     private fun cleanDisciplineName(name: String): String {
-        val prefixes = listOf("лек ", "лк ", "пр ", "лаб ")
-        var result = name
+        val prefixes = listOf(
+            "дифференцированный зачет ",
+            "дифференцированный зачёт ",
+            "диф. зачёт ",
+            "диф. зачет ",
+            "диф.зачёт ",
+            "диф.зачет ",
+            "диф зачёт ",
+            "диф зачет ",
+            "диф.зач ",
+            "диф зач ",
+            "консультация ",
+            "экзамен ",
+            "зачёт ",
+            "зачет ",
+            "экз ",
+            "зач ",
+            "конс ",
+            "диф ",
+            "лек ",
+            "лк ",
+            "лаб ",
+            "пр "
+        )
+        val lower = name.lowercase()
         for (prefix in prefixes) {
-            if (result.lowercase().startsWith(prefix)) {
-                result = result.substring(prefix.length).trimStart()
-                break
+            if (lower.startsWith(prefix)) {
+                return name.substring(prefix.length).trim()
             }
         }
-        return result.trim()
+        return name.trim()
     }
 
     private fun parseDateTime(raw: String): LocalDateTime? {

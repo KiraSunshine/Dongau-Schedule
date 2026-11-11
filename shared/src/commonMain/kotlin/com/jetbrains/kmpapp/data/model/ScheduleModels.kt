@@ -32,17 +32,33 @@ enum class LessonType(val displayName: String, val shortName: String) {
     LECTURE("Лекция", "лек"),
     PRACTICE("Практика", "пр"),
     LAB("Лабораторная", "лаб"),
+    EXAM("Экзамен", "экз"),
+    CREDIT("Зачёт", "зач"),
+    DIFF_CREDIT("Диф. зачёт", "диф.зач"),
+    CONSULTATION("Консультация", "конс"),
     OTHER("Занятие", "другое");
 
     companion object {
         fun fromDisciplineName(name: String): LessonType {
             val lower = name.lowercase().trim()
             return when {
+                lower.startsWith("экз") -> EXAM
+                lower.startsWith("диф") -> DIFF_CREDIT
+                lower.startsWith("зач") -> CREDIT
+                lower.startsWith("конс") -> CONSULTATION
                 lower.startsWith("лек") || lower.startsWith("лк") -> LECTURE
                 lower.startsWith("лаб") -> LAB
                 lower.startsWith("пр") -> PRACTICE
                 else -> OTHER
             }
+        }
+
+        fun isExamLike(name: String): Boolean {
+            val lower = name.lowercase().trim()
+            return lower.startsWith("экз") ||
+                lower.startsWith("зач") ||
+                lower.startsWith("диф") ||
+                lower.startsWith("конс")
         }
     }
 }

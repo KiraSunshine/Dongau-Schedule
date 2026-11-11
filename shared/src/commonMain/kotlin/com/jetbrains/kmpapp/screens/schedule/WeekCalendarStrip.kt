@@ -297,6 +297,10 @@ private fun getLessonDotColor(type: com.jetbrains.kmpapp.data.model.LessonType, 
             com.jetbrains.kmpapp.data.model.LessonType.LECTURE -> Color(0xFF4ADE80)
             com.jetbrains.kmpapp.data.model.LessonType.PRACTICE -> Color(0xFFFBBF24)
             com.jetbrains.kmpapp.data.model.LessonType.LAB -> Color(0xFFA78BFA)
+            com.jetbrains.kmpapp.data.model.LessonType.EXAM -> Color(0xFFF87171)
+            com.jetbrains.kmpapp.data.model.LessonType.CREDIT -> Color(0xFF60A5FA)
+            com.jetbrains.kmpapp.data.model.LessonType.DIFF_CREDIT -> Color(0xFF2DD4BF)
+            com.jetbrains.kmpapp.data.model.LessonType.CONSULTATION -> Color(0xFF818CF8)
             com.jetbrains.kmpapp.data.model.LessonType.OTHER -> Color(0xFF9CA3AF)
         }
     } else {
@@ -304,6 +308,10 @@ private fun getLessonDotColor(type: com.jetbrains.kmpapp.data.model.LessonType, 
             com.jetbrains.kmpapp.data.model.LessonType.LECTURE -> Color(0xFF16A34A)
             com.jetbrains.kmpapp.data.model.LessonType.PRACTICE -> Color(0xFFD97706)
             com.jetbrains.kmpapp.data.model.LessonType.LAB -> Color(0xFF8B5CF6)
+            com.jetbrains.kmpapp.data.model.LessonType.EXAM -> Color(0xFFDC2626)
+            com.jetbrains.kmpapp.data.model.LessonType.CREDIT -> Color(0xFF2563EB)
+            com.jetbrains.kmpapp.data.model.LessonType.DIFF_CREDIT -> Color(0xFF0D9488)
+            com.jetbrains.kmpapp.data.model.LessonType.CONSULTATION -> Color(0xFF4F46E5)
             com.jetbrains.kmpapp.data.model.LessonType.OTHER -> Color(0xFF6B7280)
         }
     }

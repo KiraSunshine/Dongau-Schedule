@@ -231,9 +231,13 @@ fun LessonDetailScreen(
                             colorHex = DefaultSubjectColors[colorIdx],
                             importance = SubjectImportance.MEDIUM,
                             assessmentType = when (lesson.lessonType) {
+                                LessonType.EXAM -> AssessmentType.EXAM
+                                LessonType.CREDIT -> AssessmentType.TEST
+                                LessonType.DIFF_CREDIT -> AssessmentType.DIFF_TEST
+                                LessonType.CONSULTATION -> AssessmentType.TEST
                                 LessonType.LAB -> AssessmentType.CREDIT
                                 LessonType.PRACTICE -> AssessmentType.TEST
-                                else -> AssessmentType.EXAM
+                                LessonType.LECTURE, LessonType.OTHER -> AssessmentType.EXAM
                             },
                             teacherName = lesson.teachers.joinToString(", "),
                             roomOrLink = lesson.classrooms.joinToString(", "),
