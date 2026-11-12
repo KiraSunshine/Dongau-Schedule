@@ -2,16 +2,27 @@ package com.jetbrains.kmpapp.data
 
 import com.jetbrains.kmpapp.data.api.DongauScheduleApi
 import com.jetbrains.kmpapp.data.model.AttendanceRule
+import com.jetbrains.kmpapp.data.model.CustomLesson
+import com.jetbrains.kmpapp.data.model.ExtraLesson
 import com.jetbrains.kmpapp.data.model.DateUtils
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.LessonDiffItem
 import com.jetbrains.kmpapp.data.model.LessonDiffType
+import com.jetbrains.kmpapp.data.model.LessonNote
+import com.jetbrains.kmpapp.data.model.LessonVisit
+import com.jetbrains.kmpapp.data.model.ReminderSettings
 import com.jetbrains.kmpapp.data.model.ScheduleDiff
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
+import com.jetbrains.kmpapp.data.model.SubjectNote
 import com.jetbrains.kmpapp.data.model.ThemeMode
+import com.jetbrains.kmpapp.data.model.expandForTarget
+import com.jetbrains.kmpapp.data.model.expandExtraForTarget
 import com.jetbrains.kmpapp.data.parser.DongauScheduleParser
 import com.jetbrains.kmpapp.data.storage.ScheduleStorage
 import com.jetbrains.kmpapp.theme.ThemeOverlay
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.plus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -27,7 +39,8 @@ import kotlin.time.Clock
 class ScheduleRepository(
     private val api: DongauScheduleApi,
     private val storage: ScheduleStorage,
-    private val powerManager: com.jetbrains.kmpapp.data.power.PlatformPowerManager
+    private val powerManager: com.jetbrains.kmpapp.data.power.PlatformPowerManager,
+    private val reminderManager: com.jetbrains.kmpapp.data.notifications.LessonReminderManager = com.jetbrains.kmpapp.data.notifications.NoopLessonReminderManager
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -37,6 +50,14 @@ class ScheduleRepository(
     val showEmptyLessons: StateFlow<Boolean> = storage.showEmptyLessons
     val themeMode: StateFlow<ThemeMode> = storage.themeMode
     val dockTabs: StateFlow<List<com.jetbrains.kmpapp.screens.components.AppTab>> = storage.dockTabs
+    val lessonNotes: StateFlow<Map<String, LessonNote>> = storage.lessonNotes
+    val subjectNotes: StateFlow<Map<String, SubjectNote>> = storage.subjectNotes
+    val reminderSettings: StateFlow<ReminderSettings> = storage.reminderSettings
+    val customLessons: StateFlow<List<CustomLesson>> = storage.customLessons
+    val extraLessons: StateFlow<List<ExtraLesson>> = storage.extraLessons
+    val subjectColorOverrides: StateFlow<Map<String, String>> = storage.subjectColorOverrides
+    val customSubjectColors: StateFlow<List<String>> = storage.customSubjectColors
+    val lessonVisits: StateFlow<Map<String, LessonVisit>> = storage.lessonVisits
 
     fun setDockTabs(tabs: List<com.jetbrains.kmpapp.screens.components.AppTab>) {
         storage.setDockTabs(tabs)
@@ -94,6 +115,55 @@ class ScheduleRepository(
 
     fun resetAttendanceRules() = storage.resetAttendanceRules()
 
+    fun getLessonNote(targetId: Int, date: LocalDate, bellNumber: Int): LessonNote? =
+        storage.getLessonNote(targetId, date, bellNumber)
+
+    fun setLessonNote(note: LessonNote) = storage.setLessonNote(note)
+
+    fun removeLessonNote(targetId: Int, date: LocalDate, bellNumber: Int) =
+        storage.removeLessonNote(targetId, date, bellNumber)
+
+    fun getSubjectNote(targetId: Int, subject: String): SubjectNote? =
+        storage.getSubjectNote(targetId, subject)
+
+    fun setSubjectNote(note: SubjectNote) = storage.setSubjectNote(note)
+
+    fun removeSubjectNote(targetId: Int, subject: String) =
+        storage.removeSubjectNote(targetId, subject)
+
+    fun clearPastLessonNotes(today: LocalDate = DateUtils.today()) =
+        storage.clearPastLessonNotes(today)
+
+    fun setReminderSettings(settings: ReminderSettings) = storage.setReminderSettings(settings)
+
+    fun addCustomLesson(lesson: CustomLesson) = storage.addCustomLesson(lesson)
+
+    fun addCustomLessons(lessons: List<CustomLesson>) = storage.addCustomLessons(lessons)
+
+    fun updateCustomLesson(lesson: CustomLesson) = storage.updateCustomLesson(lesson)
+
+    fun removeCustomLesson(id: String) = storage.removeCustomLesson(id)
+
+    fun removeCustomLessonsForTarget(targetId: Int) = storage.removeCustomLessonsForTarget(targetId)
+
+    fun addExtraLesson(lesson: ExtraLesson) = storage.addExtraLesson(lesson)
+    fun addExtraLessons(lessons: List<ExtraLesson>) = storage.addExtraLessons(lessons)
+    fun updateExtraLesson(lesson: ExtraLesson) = storage.updateExtraLesson(lesson)
+    fun removeExtraLesson(id: String) = storage.removeExtraLesson(id)
+    fun removeExtraLessonsForTarget(targetId: Int) = storage.removeExtraLessonsForTarget(targetId)
+
+    fun setSubjectColor(subjectKey: String, colorHex: String?) = storage.setSubjectColor(subjectKey, colorHex)
+    fun addCustomSubjectColor(colorHex: String) = storage.addCustomSubjectColor(colorHex)
+    fun removeCustomSubjectColor(colorHex: String) = storage.removeCustomSubjectColor(colorHex)
+
+    fun setLessonVisit(visit: LessonVisit) = storage.setLessonVisit(visit)
+
+    fun removeLessonVisit(targetId: Int, date: LocalDate, bellNumber: Int) =
+        storage.removeLessonVisit(targetId, date, bellNumber)
+
+    fun clearLessonVisitsForSubject(targetId: Int, subjectKey: String) =
+        storage.clearLessonVisitsForSubject(targetId, subjectKey)
+
     fun setThemeMode(mode: ThemeMode) {
         storage.setThemeMode(mode)
     }
@@ -105,12 +175,14 @@ class ScheduleRepository(
     val cheatsAgreed: StateFlow<Boolean?> = storage.cheatsAgreed
     val cheatsBlocked: StateFlow<Boolean> = storage.cheatsBlocked
     val betaChannel: StateFlow<Boolean> = storage.betaChannel
+    val shareAttendanceEnabled: StateFlow<Boolean> = storage.shareAttendanceEnabled
 
     fun setThemeOverlay(overlay: ThemeOverlay) = storage.setThemeOverlay(overlay)
     fun setMatrixTheme(enabled: Boolean) = storage.setMatrixTheme(enabled)
     fun setCheatsAgreed(agreed: Boolean?) = storage.setCheatsAgreed(agreed)
     fun setCheatsBlocked(blocked: Boolean) = storage.setCheatsBlocked(blocked)
     fun setBetaChannel(enabled: Boolean) = storage.setBetaChannel(enabled)
+    fun setShareAttendanceEnabled(enabled: Boolean) = storage.setShareAttendanceEnabled(enabled)
 
     fun setSakuraTheme(enabled: Boolean) {
         storage.setSakuraThemeExclusive(enabled)
@@ -122,11 +194,27 @@ class ScheduleRepository(
 
     val currentLessons: StateFlow<List<Lesson>> = combine(
         storage.selectedTarget,
-        storage.cachedLessons
-    ) { selected, cache ->
-        if (selected == null) emptyList()
-        else cache[selected.id] ?: emptyList()
+        storage.cachedLessons,
+        storage.customLessons,
+        storage.extraLessons
+    ) { selected, cache, custom, extra ->
+        if (selected == null) {
+            emptyList()
+        } else {
+            val serverLessons = cache[selected.id] ?: emptyList()
+            val today = DateUtils.today()
+            val from = today.plus(DatePeriod(days = -90))
+            val serverFuture = serverLessons.filter { it.date >= today }
+            val lastServerDate = serverFuture.maxOfOrNull { it.date }
+            val to = maxOf(today.plus(DatePeriod(days = 365)), lastServerDate ?: today)
+            val customExpanded = custom.expandForTarget(selected.id, from, to)
+            val extraExpanded = extra.expandExtraForTarget(selected.id, from, to)
+            (serverLessons + customExpanded + extraExpanded)
+                .distinctBy { it.id }
+                .sortedWith(compareBy({ it.date }, { it.bellNumber }, { it.subject }))
+        }
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
 
     init {
         scope.launch {
@@ -139,18 +227,39 @@ class ScheduleRepository(
                     val isFresh = (now - lastSync) < 30 * 60 * 1000L // 30 minutes TTL
 
                     if (!hasCached) {
-                        // First load for this target: fetch from network with loading indicator
+                        // Первая загрузка для этой цели: обязательно тянем с сервера
                         refreshSchedule(target, silent = false)
                     } else if (!isFresh) {
-                        // Power saving policy:
-                        // If system is in Low Power Mode / Battery Saver OR the app is in background,
-                        // do not wake up the cellular/Wi-Fi radio for silent background sync! Use cached lessons.
+                        // Политика энергосбережения:
+                        // если включён режим энергосбережения или приложение в фоне —
+                        // не будим сеть без явной необходимости, используем кэш.
                         val shouldSkipSilentSync = powerManager.isLowPowerMode.value || !powerManager.isAppInForeground.value
                         if (!shouldSkipSilentSync) {
                             refreshSchedule(target, silent = true)
                         }
                     }
-                    // Otherwise: cache is fresh (< 30 min), do not make network call!
+                    // Иначе кэш свежий (< 30 мин) — сетевой запрос не нужен.
+                }
+            }
+        }
+
+        // Перепланируем напоминания при изменении пар, посещаемости или настроек.
+        // Debounce, чтобы не нагружать систему при быстрой отметке посещений.
+        scope.launch {
+            combine(
+                currentLessons,
+                storage.attendanceRules,
+                storage.reminderSettings
+            ) { lessons, attendance, settings ->
+                Triple(lessons, attendance, settings)
+            }.collectLatest { (lessons, attendance, settings) ->
+                try {
+                    kotlinx.coroutines.delay(600)
+                    reminderManager.reschedule(lessons, attendance, settings)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    println("Reminder reschedule failed: ${t.message}")
                 }
             }
         }
@@ -161,6 +270,17 @@ class ScheduleRepository(
             api.searchGroups(query)
         } catch (e: Exception) {
             println("DongauScheduleApi.search failed: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /** Загрузить расписание цели без сохранения (для сравнения и т.п.). */
+    suspend fun fetchLessonsForTarget(target: ScheduleTarget): List<Lesson> {
+        return try {
+            val response = api.getSchedule(target.type, target.id)
+            DongauScheduleParser.parse(response)
+        } catch (e: Exception) {
+            println("fetchLessonsForTarget error for ${target.targetTitle}: ${e.message}")
             emptyList()
         }
     }
@@ -199,35 +319,34 @@ class ScheduleRepository(
             val hasCachedLessons = oldLessons.isNotEmpty()
             val today = DateUtils.today()
 
-            // Сайт ДонГАУ иногда отдаёт пустой список (например, во время обновления
-            // расписания). Не затираем последнее известное расписание в этом случае.
+            // Сервер вернул пустой ответ, но у нас уже есть сохранённое расписание.
+            // Не затираем кэш пустым списком в этом случае.
             if (parsedLessons.isEmpty() && hasCachedLessons) {
                 storage.setLastSyncTime(target.id, Clock.System.now().toEpochMilliseconds())
                 _errorMessage.value = null
                 if (!silent) {
                     _refreshStatus.value = com.jetbrains.kmpapp.data.model.RefreshStatus.Success(
-                        message = "Сайт вернул пустое расписание — показаны сохранённые данные"
+                        message = "Сервер вернул пустой ответ — сохранён кэш"
                     )
                 }
                 return
             }
 
-            // Если расписания нет и в кэше — показываем понятную ошибку,
-            // а не «На этот день пар нет» на каждом дне.
+            // Если расписания нет и в кэше — показываем понятную ошибку.
             if (parsedLessons.isEmpty()) {
                 _errorMessage.value =
-                    "Сайт ДонГАУ не отдаёт расписание для этой группы (пустой ответ). Попробуйте позже."
+                    "Сервер не вернул расписание для этой группы (пустой ответ). Попробуйте позже."
                 if (!silent) {
                     _refreshStatus.value = com.jetbrains.kmpapp.data.model.RefreshStatus.Error(
                         com.jetbrains.kmpapp.data.model.AppErrorCode.ERR_NOT_FOUND,
-                        message = "Сайт вернул пустое расписание"
+                        message = "Сервер вернул пустое расписание"
                     )
                 }
                 return
             }
 
-            // Прошедшие дни (< today) сохраняем как историю и не даём серверу их затирать.
-            // На сегодня и будущее доверяем серверу (актуальные пары, переносы, сессия/экзамены).
+            // Прошедшие пары (< today) сохраняем из кэша и не затираем серверным ответом.
+            // С сегодня и далее доверяем серверу (актуальные замены, переносы, отмены/добавления).
             val preservedPast = oldLessons.filter { it.date < today }
             val serverCurrent = parsedLessons.filter { it.date >= today }
             val mergedLessons = (preservedPast + serverCurrent).distinctBy { it.id }
@@ -250,15 +369,31 @@ class ScheduleRepository(
                     _activeDiff.value = diff
                 }
             }
-        } catch (e: Exception) {
-            println("refreshSchedule error for ${target.targetTitle}: ${e.message}")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            val detail = buildString {
+                append(e::class.simpleName ?: "Error")
+                val msg = e.message?.trim().orEmpty()
+                if (msg.isNotEmpty()) append(": ").append(msg)
+                val cause = e.cause
+                if (cause != null && cause !== e) {
+                    append(" | cause: ").append(cause::class.simpleName ?: "Cause")
+                    val cmsg = cause.message?.trim().orEmpty()
+                    if (cmsg.isNotEmpty()) append(": ").append(cmsg)
+                }
+            }
+            println("refreshSchedule error for ${target.targetTitle} (${target.type}/${target.id}): $detail")
             val code = com.jetbrains.kmpapp.data.model.AppErrorCode.fromException(e)
-            _refreshStatus.value = com.jetbrains.kmpapp.data.model.RefreshStatus.Error(code)
+            _refreshStatus.value = com.jetbrains.kmpapp.data.model.RefreshStatus.Error(
+                code = code,
+                message = "Ошибка ${code.code}: ${code.shortTitle}. $detail"
+            )
             // Only show user-facing full-screen error if there is NO cached data at all
             val cached = storage.getLessons(target.id)
-            val hasCached = cached != null && cached.isNotEmpty()
-            if (!hasCached) {
-                _errorMessage.value = "Ошибка (${code.code}): ${code.shortTitle}"
+            val hasCache = cached != null && cached.isNotEmpty()
+            if (!hasCache) {
+                _errorMessage.value = "Ошибка ${code.code}: ${code.shortTitle}\n$detail"
             }
         } finally {
             if (!silent) {

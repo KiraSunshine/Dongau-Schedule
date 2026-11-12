@@ -19,11 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.DonutLarge
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.outlined.DateRange
-import androidx.compose.material.icons.outlined.MeetingRoom
+import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.Icon
@@ -52,7 +52,7 @@ enum class AppTab(
     val isFixed: Boolean = false
 ) {
     SCHEDULE("Расписание", Icons.Filled.DateRange, Icons.Outlined.DateRange, isFixed = true),
-    FREE_ROOMS("Аудитории", Icons.Filled.MeetingRoom, Icons.Outlined.MeetingRoom, isFixed = false),
+    PROGRESS("Прогресс", Icons.Filled.DonutLarge, Icons.Outlined.DonutLarge, isFixed = false),
     TASKS("Задачи", Icons.Filled.TaskAlt, Icons.Outlined.TaskAlt, isFixed = false),
     OTHER("Другое", Icons.Filled.Settings, Icons.Outlined.Settings, isFixed = true)
 }

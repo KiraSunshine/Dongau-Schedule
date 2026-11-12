@@ -11,6 +11,8 @@ dependencies {
     implementation(libs.compose.uiToolingPreview)
     implementation(libs.compose.foundation)
     implementation(libs.ktor.client.okhttp)
+    implementation(libs.kotlinx.datetime)
+    implementation(libs.ktor.serialization.kotlinx.json)
 }
 
 android {
@@ -25,7 +27,7 @@ android {
             ?: System.getenv("BUILD_NUMBER")?.toIntOrNull()
             ?: 42
         // CI подставляет версию канала через tools/versioning.py; в репо — базовая версия линии разработки
-        versionName = "26.0.14"
+        versionName = "27.0.1"
     }
     signingConfigs {
         create("sharedDebug") {

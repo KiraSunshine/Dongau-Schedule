@@ -1,10 +1,21 @@
 package com.jetbrains.kmpapp.data.storage
 
 import com.jetbrains.kmpapp.data.model.AttendanceRule
+import com.jetbrains.kmpapp.data.model.CustomLesson
+import com.jetbrains.kmpapp.data.model.ExtraLesson
+import com.jetbrains.kmpapp.data.model.DateUtils
 import com.jetbrains.kmpapp.data.model.Lesson
+import com.jetbrains.kmpapp.data.model.LessonNote
+import com.jetbrains.kmpapp.data.model.LessonVisit
+import com.jetbrains.kmpapp.data.model.ReminderSettings
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
+import com.jetbrains.kmpapp.data.model.SubjectNote
 import com.jetbrains.kmpapp.data.model.ThemeMode
+import com.jetbrains.kmpapp.data.model.isExpired
+import com.jetbrains.kmpapp.data.model.lessonNoteKey
+import com.jetbrains.kmpapp.data.model.lessonVisitKey
 import com.jetbrains.kmpapp.data.model.seriesKey
+import com.jetbrains.kmpapp.data.model.subjectNoteKey
 import com.jetbrains.kmpapp.screens.components.AppTab
 import com.jetbrains.kmpapp.theme.ThemeOverlay
 import kotlinx.coroutines.CoroutineScope
@@ -77,6 +88,36 @@ class ScheduleStorage(
     private val _betaChannel = MutableStateFlow(false)
     val betaChannel: StateFlow<Boolean> = _betaChannel.asStateFlow()
 
+    private val _shareAttendanceEnabled = MutableStateFlow(false)
+    val shareAttendanceEnabled: StateFlow<Boolean> = _shareAttendanceEnabled.asStateFlow()
+
+    private val _lessonNotes = MutableStateFlow<Map<String, LessonNote>>(emptyMap())
+    val lessonNotes: StateFlow<Map<String, LessonNote>> = _lessonNotes.asStateFlow()
+
+    private val _subjectNotes = MutableStateFlow<Map<String, SubjectNote>>(emptyMap())
+    val subjectNotes: StateFlow<Map<String, SubjectNote>> = _subjectNotes.asStateFlow()
+
+        private val _reminderSettings = MutableStateFlow(ReminderSettings())
+    val reminderSettings: StateFlow<ReminderSettings> = _reminderSettings.asStateFlow()
+
+    private val _customLessons = MutableStateFlow<List<CustomLesson>>(emptyList())
+    val customLessons: StateFlow<List<CustomLesson>> = _customLessons.asStateFlow()
+
+    private val _extraLessons = MutableStateFlow<List<ExtraLesson>>(emptyList())
+    val extraLessons: StateFlow<List<ExtraLesson>> = _extraLessons.asStateFlow()
+
+    /** . */
+    private val _lessonVisits = MutableStateFlow<Map<String, LessonVisit>>(emptyMap())
+    val lessonVisits: StateFlow<Map<String, LessonVisit>> = _lessonVisits.asStateFlow()
+
+    /** . */
+    private val _subjectColorOverrides = MutableStateFlow<Map<String, String>>(emptyMap())
+    val subjectColorOverrides: StateFlow<Map<String, String>> = _subjectColorOverrides.asStateFlow()
+
+    /** . */
+    private val _customSubjectColors = MutableStateFlow<List<String>>(emptyList())
+    val customSubjectColors: StateFlow<List<String>> = _customSubjectColors.asStateFlow()
+
     private val lastSyncTimes = mutableMapOf<Int, Long>()
 
     init {
@@ -145,12 +186,15 @@ class ScheduleStorage(
             try {
                 val dockTabsStr = platformStorage.getString(KEY_DOCK_TABS)
                 if (!dockTabsStr.isNullOrBlank()) {
-                    val loaded = dockTabsStr.split(",").mapNotNull { name ->
-                        try { AppTab.valueOf(name.trim()) } catch (_: Throwable) { null }
+                    val loaded = dockTabsStr.split(",").mapNotNull { raw ->
+                        val name = raw.trim()
+                        when (name) {
+                            "FREE_ROOMS", "ROOMS" -> AppTab.PROGRESS
+                            else -> try { AppTab.valueOf(name) } catch (_: Throwable) { null }
+                        }
                     }
-                    val legacyDefault = listOf(AppTab.SCHEDULE, AppTab.FREE_ROOMS, AppTab.TASKS, AppTab.OTHER)
                     val previousDefault = listOf(AppTab.SCHEDULE, AppTab.TASKS, AppTab.OTHER)
-                    if (loaded == legacyDefault || loaded == previousDefault) {
+                    if (loaded == previousDefault) {
                         _dockTabs.value = DEFAULT_DOCK_TABS
                     } else {
                         _dockTabs.value = sanitizeDockTabs(loaded)
@@ -167,6 +211,95 @@ class ScheduleStorage(
             _cheatsBlocked.value = platformStorage.getString(KEY_CHEATS_BLOCKED)?.toBooleanStrictOrNull() ?: false
             _betaChannel.value =
                 platformStorage.getString(KEY_BETA_CHANNEL)?.toBooleanStrictOrNull() ?: false
+            _shareAttendanceEnabled.value =
+                platformStorage.getString(KEY_SHARE_ATTENDANCE_ENABLED)?.toBooleanStrictOrNull() ?: false
+
+            // Restore notes
+            try {
+                val lessonNotesJson = platformStorage.getString(KEY_LESSON_NOTES)
+                if (!lessonNotesJson.isNullOrBlank()) {
+                    _lessonNotes.value = try {
+                        json.decodeFromString<Map<String, LessonNote>>(lessonNotesJson)
+                    } catch (_: Throwable) { emptyMap() }
+                }
+            } catch (_: Throwable) {}
+            try {
+                val subjectNotesJson = platformStorage.getString(KEY_SUBJECT_NOTES)
+                if (!subjectNotesJson.isNullOrBlank()) {
+                    _subjectNotes.value = try {
+                        json.decodeFromString<Map<String, SubjectNote>>(subjectNotesJson)
+                    } catch (_: Throwable) { emptyMap() }
+                }
+            } catch (_: Throwable) {}
+
+            // Restore reminder settings
+            try {
+                val reminderJson = platformStorage.getString(KEY_REMINDER_SETTINGS)
+                if (!reminderJson.isNullOrBlank()) {
+                    _reminderSettings.value = try {
+                        json.decodeFromString<ReminderSettings>(reminderJson)
+                    } catch (_: Throwable) { ReminderSettings() }
+                }
+            } catch (_: Throwable) {}
+
+            // Restore custom lessons and purge expired by semester
+            try {
+                val customJson = platformStorage.getString(KEY_CUSTOM_LESSONS)
+                if (!customJson.isNullOrBlank()) {
+                    val loaded = try {
+                        json.decodeFromString<List<CustomLesson>>(customJson)
+                    } catch (_: Throwable) { emptyList() }
+                    val currentSem = DateUtils.currentSemesterKey()
+                    val filtered = loaded.filterNot { it.isExpired(currentSem) }
+                    _customLessons.value = filtered
+                    if (filtered.size != loaded.size) persistCustomLessons()
+                }
+            } catch (_: Throwable) {}
+
+
+            // Restore extra (out-of-schedule) lessons
+            try {
+                val extraJson = platformStorage.getString(KEY_EXTRA_LESSONS)
+                if (!extraJson.isNullOrBlank()) {
+                    _extraLessons.value = try {
+                        json.decodeFromString<List<ExtraLesson>>(extraJson)
+                    } catch (_: Throwable) {
+                        emptyList()
+                    }
+                }
+            } catch (_: Throwable) {}
+
+            // Restore lesson visits (actual attendance facts)
+            try {
+                val visitsJson = platformStorage.getString(KEY_LESSON_VISITS)
+                if (!visitsJson.isNullOrBlank()) {
+                    _lessonVisits.value = try {
+                        json.decodeFromString<Map<String, LessonVisit>>(visitsJson)
+                    } catch (_: Throwable) {
+                        emptyMap()
+                    }
+                }
+            } catch (_: Throwable) {}
+
+            // Restore subject color overrides and custom colors
+            try {
+                val subjectColorsJson = platformStorage.getString(KEY_SUBJECT_COLOR_OVERRIDES)
+                if (!subjectColorsJson.isNullOrBlank()) {
+                    _subjectColorOverrides.value = try {
+                        json.decodeFromString<Map<String, String>>(subjectColorsJson)
+                    } catch (_: Throwable) {
+                        emptyMap()
+                    }
+                }
+                val customColorsJson = platformStorage.getString(KEY_CUSTOM_SUBJECT_COLORS)
+                if (!customColorsJson.isNullOrBlank()) {
+                    _customSubjectColors.value = try {
+                        json.decodeFromString<List<String>>(customColorsJson)
+                    } catch (_: Throwable) {
+                        emptyList()
+                    }
+                }
+            } catch (_: Throwable) {}
 
             // Restore saved targets
             val targets: List<ScheduleTarget> = try {
@@ -305,6 +438,158 @@ class ScheduleStorage(
         }
     }
 
+    // --- Notes ---
+
+    fun getLessonNote(targetId: Int, date: kotlinx.datetime.LocalDate, bellNumber: Int): LessonNote? =
+        _lessonNotes.value[lessonNoteKey(targetId, date, bellNumber)]
+
+    fun setLessonNote(note: LessonNote) {
+        val key = lessonNoteKey(note.targetId, note.date, note.bellNumber)
+        _lessonNotes.update { map ->
+            if (note.text.isBlank()) map - key else map + (key to note)
+        }
+        persistLessonNotes()
+    }
+
+    fun removeLessonNote(targetId: Int, date: kotlinx.datetime.LocalDate, bellNumber: Int) {
+        val key = lessonNoteKey(targetId, date, bellNumber)
+        _lessonNotes.update { it - key }
+        persistLessonNotes()
+    }
+
+    fun getSubjectNote(targetId: Int, subject: String): SubjectNote? =
+        _subjectNotes.value[subjectNoteKey(targetId, subject)]
+
+    fun setSubjectNote(note: SubjectNote) {
+        val key = subjectNoteKey(note.targetId, note.subjectKey.ifBlank { note.subjectDisplayName })
+        val normalized = note.copy(subjectKey = note.subjectKey.ifBlank { note.subjectDisplayName.trim().lowercase() })
+        val finalKey = subjectNoteKey(normalized.targetId, normalized.subjectKey)
+        _subjectNotes.update { map ->
+            if (normalized.text.isBlank()) map - finalKey else map + (finalKey to normalized)
+        }
+        persistSubjectNotes()
+    }
+
+    fun removeSubjectNote(targetId: Int, subject: String) {
+        val key = subjectNoteKey(targetId, subject)
+        _subjectNotes.update { it - key }
+        persistSubjectNotes()
+    }
+
+    fun clearNotesForTarget(targetId: Int) {
+        _lessonNotes.update { map -> map.filterValues { it.targetId != targetId } }
+        _subjectNotes.update { map -> map.filterValues { it.targetId != targetId } }
+        _lessonVisits.update { map -> map.filterValues { it.targetId != targetId } }
+        persistLessonNotes()
+        persistSubjectNotes()
+        persistLessonVisits()
+    }
+
+    fun clearPastLessonNotes(today: kotlinx.datetime.LocalDate) {
+        _lessonNotes.update { map -> map.filterValues { it.date >= today } }
+        persistLessonNotes()
+    }
+
+    private fun persistLessonNotes() {
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_LESSON_NOTES, json.encodeToString(_lessonNotes.value))
+            } catch (e: Exception) {
+                println("Failed to persist lesson notes: ${e.message}")
+            }
+        }
+    }
+
+    private fun persistSubjectNotes() {
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_SUBJECT_NOTES, json.encodeToString(_subjectNotes.value))
+            } catch (e: Exception) {
+                println("Failed to persist subject notes: ${e.message}")
+            }
+        }
+    }
+
+    // --- Lesson visits (actual attendance facts) ---
+
+    fun setLessonVisit(visit: LessonVisit) {
+        val key = lessonVisitKey(visit.targetId, visit.date, visit.bellNumber)
+        _lessonVisits.update { map -> map + (key to visit) }
+        persistLessonVisits()
+    }
+
+    fun removeLessonVisit(targetId: Int, date: kotlinx.datetime.LocalDate, bellNumber: Int) {
+        val key = lessonVisitKey(targetId, date, bellNumber)
+        _lessonVisits.update { map -> map - key }
+        persistLessonVisits()
+    }
+
+    fun clearLessonVisitsForSubject(targetId: Int, subjectKey: String) {
+        val normalized = subjectKey.trim().lowercase()
+        _lessonVisits.update { map -> map.filterValues { !(it.targetId == targetId && it.subjectKey.trim().lowercase() == normalized) } }
+        persistLessonVisits()
+    }
+
+    private fun persistLessonVisits() {
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_LESSON_VISITS, json.encodeToString(_lessonVisits.value))
+            } catch (e: Exception) {
+                println("Failed to persist lesson visits: ${e.message}")
+            }
+        }
+    }
+
+    // --- Reminders ---
+
+    fun setReminderSettings(settings: ReminderSettings) {
+        _reminderSettings.value = settings.copy(minutesBefore = settings.clampedMinutes)
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_REMINDER_SETTINGS, json.encodeToString(_reminderSettings.value))
+            } catch (e: Exception) {
+                println("Failed to persist reminder settings: ${e.message}")
+            }
+        }
+    }
+
+    // --- Custom lessons ---
+
+    fun addCustomLesson(lesson: CustomLesson) {
+        addCustomLessons(listOf(lesson))
+    }
+
+    fun addCustomLessons(lessons: List<CustomLesson>) {
+        if (lessons.isEmpty()) return
+        _customLessons.update { it + lessons }
+        persistCustomLessons()
+    }
+
+    fun updateCustomLesson(lesson: CustomLesson) {
+        _customLessons.update { list -> list.map { if (it.id == lesson.id) lesson else it } }
+        persistCustomLessons()
+    }
+
+    fun removeCustomLesson(id: String) {
+        _customLessons.update { list -> list.filterNot { it.id == id } }
+        persistCustomLessons()
+    }
+
+    fun removeCustomLessonsForTarget(targetId: Int) {
+        _customLessons.update { list -> list.filterNot { it.targetId == targetId } }
+        persistCustomLessons()
+    }
+
+    private fun persistCustomLessons() {
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_CUSTOM_LESSONS, json.encodeToString(_customLessons.value))
+            } catch (e: Exception) {
+                println("Failed to persist custom lessons: ${e.message}")
+            }
+        }
+    }
+
     fun setThemeOverlay(overlay: ThemeOverlay) {
         _themeOverlay.value = overlay
         scope.launch {
@@ -343,6 +628,11 @@ class ScheduleStorage(
     fun setBetaChannel(enabled: Boolean) {
         _betaChannel.value = enabled
         scope.launch { platformStorage.saveString(KEY_BETA_CHANNEL, enabled.toString()) }
+    }
+
+    fun setShareAttendanceEnabled(enabled: Boolean) {
+        _shareAttendanceEnabled.value = enabled
+        scope.launch { platformStorage.saveString(KEY_SHARE_ATTENDANCE_ENABLED, enabled.toString()) }
     }
 
     fun setSakuraThemeExclusive(enabled: Boolean) {
@@ -403,6 +693,9 @@ class ScheduleStorage(
         lastSyncTimes.remove(targetId)
         platformStorage.remove(KEY_LESSONS_PREFIX + targetId)
         platformStorage.remove(KEY_LAST_SYNC_PREFIX + targetId)
+        clearNotesForTarget(targetId)
+        removeCustomLessonsForTarget(targetId)
+        removeExtraLessonsForTarget(targetId)
         persistTargets()
     }
 
@@ -468,6 +761,7 @@ class ScheduleStorage(
         val cheatsAgreedBefore = _cheatsAgreed.value
         val cheatsBlockedBefore = _cheatsBlocked.value
         val betaChannelBefore = _betaChannel.value
+        val shareAttendanceEnabledBefore = _shareAttendanceEnabled.value
         platformStorage.clearAll()
         _savedTargets.value = emptyList()
         _selectedTarget.value = null
@@ -477,18 +771,26 @@ class ScheduleStorage(
         _autoScrollToCurrentLesson.value = true
         _showAbbreviatedNames.value = false
         _attendanceRules.value = emptyList()
+        _lessonNotes.value = emptyMap()
+        _subjectNotes.value = emptyMap()
+        _lessonVisits.value = emptyMap()
+        _reminderSettings.value = ReminderSettings()
+        _customLessons.value = emptyList()
+        _extraLessons.value = emptyList()
         _themeMode.value = ThemeMode.SYSTEM
         _dockTabs.value = DEFAULT_DOCK_TABS
         _themeOverlay.value = ThemeOverlay.NONE
         _cheatsAgreed.value = cheatsAgreedBefore
         _cheatsBlocked.value = cheatsBlockedBefore
         _betaChannel.value = betaChannelBefore
+        _shareAttendanceEnabled.value = shareAttendanceEnabledBefore
         lastSyncTimes.clear()
         scope.launch {
             if (cheatsAgreedBefore == null) platformStorage.remove(KEY_CHEATS_AGREED)
             else platformStorage.saveString(KEY_CHEATS_AGREED, cheatsAgreedBefore.toString())
             platformStorage.saveString(KEY_CHEATS_BLOCKED, cheatsBlockedBefore.toString())
             platformStorage.saveString(KEY_BETA_CHANNEL, betaChannelBefore.toString())
+            platformStorage.saveString(KEY_SHARE_ATTENDANCE_ENABLED, shareAttendanceEnabledBefore.toString())
         }
     }
 
@@ -550,6 +852,95 @@ class ScheduleStorage(
         }
     }
 
+    fun setSubjectColor(subjectKey: String, colorHex: String?) {
+        val key = subjectKey.trim().lowercase()
+        if (key.isBlank()) return
+        val normalized = colorHex?.trim()?.takeIf { it.isNotBlank() }
+        _subjectColorOverrides.update { map ->
+            if (normalized == null) map - key else map + (key to normalized)
+        }
+        persistSubjectColorOverrides()
+    }
+
+    fun setSubjectColorOverrides(overrides: Map<String, String>) {
+        _subjectColorOverrides.value = overrides.mapKeys { it.key.trim().lowercase() }
+            .filterKeys { it.isNotBlank() }
+            .mapValues { it.value.trim() }
+            .filterValues { it.isNotBlank() }
+        persistSubjectColorOverrides()
+    }
+
+    fun addCustomSubjectColor(colorHex: String) {
+        val normalized = colorHex.trim()
+        if (normalized.isBlank()) return
+        _customSubjectColors.update { list ->
+            if (list.any { it.equals(normalized, ignoreCase = true) }) list else list + normalized
+        }
+        persistCustomSubjectColors()
+    }
+
+    fun removeCustomSubjectColor(colorHex: String) {
+        _customSubjectColors.update { list -> list.filterNot { it.equals(colorHex, ignoreCase = true) } }
+        persistCustomSubjectColors()
+    }
+
+    private fun persistSubjectColorOverrides() {
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_SUBJECT_COLOR_OVERRIDES, json.encodeToString(_subjectColorOverrides.value))
+            } catch (e: Exception) {
+                println("Failed to persist subject color overrides: ${e.message}")
+            }
+        }
+    }
+
+    private fun persistCustomSubjectColors() {
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_CUSTOM_SUBJECT_COLORS, json.encodeToString(_customSubjectColors.value))
+            } catch (e: Exception) {
+                println("Failed to persist custom subject colors: ${e.message}")
+            }
+        }
+    }
+
+
+    fun addExtraLesson(lesson: ExtraLesson) {
+        addExtraLessons(listOf(lesson))
+    }
+
+    fun addExtraLessons(lessons: List<ExtraLesson>) {
+        if (lessons.isEmpty()) return
+        _extraLessons.update { it + lessons }
+        persistExtraLessons()
+    }
+
+    fun updateExtraLesson(lesson: ExtraLesson) {
+        _extraLessons.update { list -> list.map { if (it.id == lesson.id) lesson else it } }
+        persistExtraLessons()
+    }
+
+    fun removeExtraLesson(id: String) {
+        _extraLessons.update { list -> list.filterNot { it.id == id } }
+        persistExtraLessons()
+    }
+
+    fun removeExtraLessonsForTarget(targetId: Int) {
+        _extraLessons.update { list -> list.filterNot { it.targetId == targetId } }
+        persistExtraLessons()
+    }
+
+    private fun persistExtraLessons() {
+        scope.launch {
+            try {
+                platformStorage.saveString(KEY_EXTRA_LESSONS, json.encodeToString(_extraLessons.value))
+            } catch (e: Exception) {
+                println("Failed to persist extra lessons: ${e.message}")
+            }
+        }
+    }
+
+
     companion object {
         private const val KEY_SAVED_TARGETS = "dongau_saved_targets"
         private const val KEY_SELECTED_TARGET_ID = "dongau_selected_target_id"
@@ -560,6 +951,12 @@ class ScheduleStorage(
         private const val KEY_AUTO_SCROLL_CURRENT_LESSON = "dongau_auto_scroll_current_lesson"
         private const val KEY_SHOW_ABBREVIATED_NAMES = "dongau_show_abbreviated_names"
         private const val KEY_ATTENDANCE_RULES = "dongau_attendance_rules"
+        private const val KEY_LESSON_NOTES = "dongau_lesson_notes"
+        private const val KEY_SUBJECT_NOTES = "dongau_subject_notes"
+        private const val KEY_REMINDER_SETTINGS = "dongau_reminder_settings"
+        private const val KEY_CUSTOM_LESSONS = "dongau_custom_lessons"
+        private const val KEY_EXTRA_LESSONS = "dongau_extra_lessons"
+        private const val KEY_LESSON_VISITS = "dongau_lesson_visits"
         private const val KEY_APP_THEME = "dongau_app_theme"
         private const val KEY_DOCK_TABS = "dongau_dock_tabs_order"
         private const val KEY_SAKURA_THEME = "dongau_sakura_theme_secret"
@@ -569,7 +966,10 @@ class ScheduleStorage(
         private const val KEY_CHEATS_AGREED = "dongau_cheats_agreed"
         private const val KEY_CHEATS_BLOCKED = "dongau_cheats_blocked"
         private const val KEY_BETA_CHANNEL = "dongau_beta_channel"
-        val DEFAULT_DOCK_TABS = listOf(AppTab.SCHEDULE, AppTab.TASKS, AppTab.FREE_ROOMS, AppTab.OTHER)
+        private const val KEY_SHARE_ATTENDANCE_ENABLED = "dongau_share_attendance_enabled"
+        private const val KEY_SUBJECT_COLOR_OVERRIDES = "dongau_subject_color_overrides"
+        private const val KEY_CUSTOM_SUBJECT_COLORS = "dongau_custom_subject_colors"
+        val DEFAULT_DOCK_TABS = listOf(AppTab.SCHEDULE, AppTab.TASKS, AppTab.PROGRESS, AppTab.OTHER)
     }
 }
 

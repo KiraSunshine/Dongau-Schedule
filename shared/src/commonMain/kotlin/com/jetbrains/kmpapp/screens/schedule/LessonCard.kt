@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -47,9 +49,12 @@ import com.jetbrains.kmpapp.data.model.AttendanceRule
 import com.jetbrains.kmpapp.data.model.AttendanceStatus
 import com.jetbrains.kmpapp.data.model.Lesson
 import com.jetbrains.kmpapp.data.model.LessonType
+import com.jetbrains.kmpapp.data.model.LessonVisit
+import com.jetbrains.kmpapp.data.model.lessonVisitKey
 import com.jetbrains.kmpapp.data.model.ScheduleSlot
 import com.jetbrains.kmpapp.data.model.ScheduleTargetType
 import com.jetbrains.kmpapp.data.model.statusFor
+import com.jetbrains.kmpapp.data.model.effectiveStatusFor
 
 @Composable
 fun ScheduleSlotCard(
@@ -61,6 +66,8 @@ fun ScheduleSlotCard(
     showAbbreviatedNames: Boolean = false,
     scheduleTargetType: ScheduleTargetType = ScheduleTargetType.GROUP,
     attendanceRules: List<AttendanceRule> = emptyList(),
+    lessonVisits: Map<String, LessonVisit> = emptyMap(),
+    targetId: Int = 0,
     onAttendanceClick: (Lesson) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -76,7 +83,8 @@ fun ScheduleSlotCard(
                     showLessonProgress = showLessonProgress,
                     showAbbreviatedNames = showAbbreviatedNames,
                     scheduleTargetType = scheduleTargetType,
-                    attendanceStatus = attendanceRules.statusFor(lesson),
+                    attendanceStatus = attendanceRules.effectiveStatusFor(lesson),
+                    visit = if (targetId != 0) lessonVisits[com.jetbrains.kmpapp.data.model.lessonVisitKey(targetId, lesson.date, lesson.bellNumber)] else null,
                     onAttendanceClick = { onAttendanceClick(lesson) },
                     modifier = modifier
                 )
@@ -93,6 +101,8 @@ fun ScheduleSlotCard(
                     showAbbreviatedNames = showAbbreviatedNames,
                     scheduleTargetType = scheduleTargetType,
                     attendanceRules = attendanceRules,
+                    lessonVisits = lessonVisits,
+                    targetId = targetId,
                     onAttendanceClick = onAttendanceClick,
                     modifier = modifier
                 )
@@ -119,6 +129,7 @@ fun LessonCard(
     showAbbreviatedNames: Boolean = false,
     scheduleTargetType: ScheduleTargetType = ScheduleTargetType.GROUP,
     attendanceStatus: AttendanceStatus? = null,
+    visit: LessonVisit? = null,
     onAttendanceClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     pageIndicator: Pair<Int, Int>? = null,
@@ -129,8 +140,11 @@ fun LessonCard(
     val cardOnBgDim = Color.White.copy(alpha = 0.7f)
     val cardOnBgSubtle = Color.White.copy(alpha = 0.45f)
 
-    val isSkipped = attendanceStatus == AttendanceStatus.SKIPPED
-    val cardAlpha = if (isSkipped) 0.3f else 1f
+    val effectiveIntent = attendanceStatus ?: AttendanceStatus.ATTENDING
+    val isSkipped = effectiveIntent == AttendanceStatus.SKIPPED
+    val factAttended = visit?.attended == true
+    val factMissed = visit?.attended == false
+    val cardAlpha = if (isSkipped && !factAttended && !factMissed) 0.45f else 1f
 
     val progress = if (isToday && showLessonProgress) {
         com.jetbrains.kmpapp.data.model.DateUtils.getLessonProgress(lesson.startTime, lesson.endTime, currentMinutes)
@@ -187,7 +201,7 @@ fun LessonCard(
                         )
                     }
 
-                    Row(
+                                        Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -205,31 +219,37 @@ fun LessonCard(
                             )
                         }
 
-                        if (onAttendanceClick != null) {
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.2f))
-                                    .clickable(onClick = onAttendanceClick),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (attendanceStatus == AttendanceStatus.SKIPPED) {
-                                        Icons.Default.Close
-                                    } else {
-                                        Icons.Default.Check
-                                    },
-                                    contentDescription = "Отметить посещаемость",
-                                    tint = if (attendanceStatus == null) {
-                                        Color.White.copy(alpha = 0.55f)
-                                    } else {
-                                        Color.White
-                                    },
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
+                        val markIcon = when {
+                            factAttended -> Icons.Default.Check
+                            factMissed -> Icons.Default.Close
+                            isSkipped -> Icons.Default.EventBusy
+                            else -> Icons.Default.EventAvailable
+                        }
+                        val markBg = when {
+                            factAttended -> Color(0xFF2E7D32).copy(alpha = 0.85f)
+                            factMissed -> Color(0xFFC62828).copy(alpha = 0.85f)
+                            else -> Color.White.copy(alpha = 0.2f)
+                        }
+                        val markDesc = when {
+                            factAttended -> "Был(а)"
+                            factMissed -> "Не был(а)"
+                            isSkipped -> "Не пойду"
+                            else -> "Пойду"
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(markBg)
+                                .then(if (onAttendanceClick != null) Modifier.clickable(onClick = onAttendanceClick) else Modifier),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = markIcon,
+                                contentDescription = markDesc,
+                                tint = Color.White,
+                                modifier = Modifier.size(17.dp)
+                            )
                         }
                     }
                 }
@@ -360,7 +380,7 @@ fun LessonCard(
                         modifier = Modifier.padding(top = 10.dp)
                     ) {
                         Text(
-                            text = "$total ${if (total in 2..4) "пары" else "пар"} в это время",
+                            text = "$total ${if (total in 2..4) "пары" else "пар"} в то же время",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = cardOnBgDim
@@ -417,6 +437,8 @@ fun MultiLessonCard(
     showAbbreviatedNames: Boolean = false,
     scheduleTargetType: ScheduleTargetType = ScheduleTargetType.GROUP,
     attendanceRules: List<AttendanceRule> = emptyList(),
+    lessonVisits: Map<String, LessonVisit> = emptyMap(),
+    targetId: Int = 0,
     onAttendanceClick: (Lesson) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -438,7 +460,8 @@ fun MultiLessonCard(
             showLessonProgress = showLessonProgress,
             showAbbreviatedNames = showAbbreviatedNames,
             scheduleTargetType = scheduleTargetType,
-            attendanceStatus = attendanceRules.statusFor(lessons[page]),
+            attendanceStatus = attendanceRules.effectiveStatusFor(lessons[page]),
+            visit = if (targetId != 0) lessonVisits[com.jetbrains.kmpapp.data.model.lessonVisitKey(targetId, lessons[page].date, lessons[page].bellNumber)] else null,
             onAttendanceClick = { onAttendanceClick(lessons[page]) },
             pageIndicator = lessons.size to pagerState.currentPage,
             horizontalMargin = 0.dp

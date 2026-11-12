@@ -5,12 +5,19 @@ import androidx.lifecycle.viewModelScope
 import com.jetbrains.kmpapp.data.ScheduleRepository
 import com.jetbrains.kmpapp.data.model.AttendanceRule
 import com.jetbrains.kmpapp.data.model.AttendanceStatus
+import com.jetbrains.kmpapp.data.model.CustomLesson
+import com.jetbrains.kmpapp.data.model.ExtraLesson
 import com.jetbrains.kmpapp.data.model.DateUtils
 import com.jetbrains.kmpapp.data.model.Lesson
+import com.jetbrains.kmpapp.data.model.LessonNote
+import com.jetbrains.kmpapp.data.model.ReminderSettings
 import com.jetbrains.kmpapp.data.model.ScheduleSlot
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
+import com.jetbrains.kmpapp.data.model.ScheduleTargetType
+import com.jetbrains.kmpapp.data.model.SubjectNote
 import com.jetbrains.kmpapp.data.model.defaultBells
 import com.jetbrains.kmpapp.data.model.seriesKey
+import com.jetbrains.kmpapp.data.model.statusFor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +44,12 @@ class ScheduleViewModel(
     val autoScrollToCurrentLesson: StateFlow<Boolean> = repository.autoScrollToCurrentLesson
     val showAbbreviatedNames: StateFlow<Boolean> = repository.showAbbreviatedNames
     val attendanceRules: StateFlow<List<AttendanceRule>> = repository.attendanceRules
+    val lessonVisits: StateFlow<Map<String, com.jetbrains.kmpapp.data.model.LessonVisit>> = repository.lessonVisits
+    val lessonNotes: StateFlow<Map<String, LessonNote>> = repository.lessonNotes
+    val subjectNotes: StateFlow<Map<String, SubjectNote>> = repository.subjectNotes
+    val reminderSettings: StateFlow<ReminderSettings> = repository.reminderSettings
+    val customLessons: StateFlow<List<CustomLesson>> = repository.customLessons
+    val extraLessons: StateFlow<List<ExtraLesson>> = repository.extraLessons
 
     private var lastAutoScrolledDate: LocalDate? = null
     private var lastAutoScrolledTargetId: Int? = null
@@ -180,6 +193,10 @@ class ScheduleViewModel(
     }
 
     fun setAttendance(lesson: Lesson, status: AttendanceStatus, intervalWeeks: Int) {
+        // Убираем факт посещения для этой пары, чтобы выбранный план был виден.
+        selectedTarget.value?.id?.let { targetId ->
+            repository.removeLessonVisit(targetId, lesson.date, lesson.bellNumber)
+        }
         repository.setAttendanceRule(
             AttendanceRule(
                 seriesKey = lesson.seriesKey(),
@@ -189,13 +206,198 @@ class ScheduleViewModel(
                 subject = lesson.subject,
                 teacher = lesson.teachers.joinToString(", "),
                 bellNumber = lesson.bellNumber,
-                dayOfWeek = lesson.date.dayOfWeek.ordinal
+                dayOfWeek = DateUtils.isoDayNumber(lesson.date.dayOfWeek)
             )
         )
     }
 
     fun clearAttendance(lesson: Lesson) {
+        // Сброс плана к умолчанию («пойду»): убираем факт, чтобы было видно план по умолчанию.
+        selectedTarget.value?.id?.let { targetId ->
+            repository.removeLessonVisit(targetId, lesson.date, lesson.bellNumber)
+        }
         repository.clearAttendanceRule(lesson)
+    }
+
+    fun setLessonNote(targetId: Int, lesson: Lesson, text: String) {
+        if (text.isBlank()) repository.removeLessonNote(targetId, lesson.date, lesson.bellNumber)
+        else repository.setLessonNote(LessonNote(targetId, lesson.date, lesson.bellNumber, text.trim()))
+    }
+
+    fun setSubjectNote(targetId: Int, lesson: Lesson, text: String) {
+        if (text.isBlank()) repository.removeSubjectNote(targetId, lesson.subject)
+        else repository.setSubjectNote(
+            SubjectNote(
+                targetId = targetId,
+                subjectKey = lesson.subject.trim().lowercase(),
+                subjectDisplayName = lesson.subject.trim(),
+                text = text.trim()
+            )
+        )
+    }
+
+    suspend fun resolveAndOpenTarget(name: String, type: ScheduleTargetType): Boolean {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return false
+        val saved = savedTargets.value.firstOrNull { it.type == type && it.targetTitle.equals(trimmed, ignoreCase = true) }
+        val target = saved ?: if (type == ScheduleTargetType.GROUP) {
+            val results = repository.search(trimmed)
+            results.firstOrNull { it.targetTitle.equals(trimmed, ignoreCase = true) }
+                ?: results.firstOrNull { it.type == type }
+        } else null
+        return if (target != null) {
+            addAndSelectTarget(target)
+            selectLessonForDetail(null)
+            true
+        } else false
+    }
+
+    fun setReminderSettings(settings: ReminderSettings) {
+        repository.setReminderSettings(settings)
+    }
+
+    fun addCustomLesson(
+        targetId: Int,
+        subject: String,
+        lessonType: com.jetbrains.kmpapp.data.model.LessonType,
+        teacher: String,
+        classroom: String,
+        group: String,
+        bellNumber: Int,
+        startTime: String,
+        endTime: String,
+        isRecurring: Boolean,
+        date: kotlinx.datetime.LocalDate?,
+        dayOfWeek: Int?,
+        intervalWeeks: Int,
+        keepEverySemester: Boolean,
+        allowOutsideSemester: Boolean = false
+    ) {
+        addCustomLessons(
+            targetId = targetId,
+            subject = subject,
+            lessonType = lessonType,
+            teacher = teacher,
+            classroom = classroom,
+            group = group,
+            bells = listOf(bellNumber to (startTime to endTime)),
+            isRecurring = isRecurring,
+            date = date,
+            dayOfWeek = dayOfWeek,
+            intervalWeeks = intervalWeeks,
+            keepEverySemester = keepEverySemester,
+            allowOutsideSemester = allowOutsideSemester
+        )
+    }
+
+    fun addCustomLessons(
+        targetId: Int,
+        subject: String,
+        lessonType: com.jetbrains.kmpapp.data.model.LessonType,
+        teacher: String,
+        classroom: String,
+        group: String,
+        bells: List<Pair<Int, Pair<String, String>>>,
+        isRecurring: Boolean,
+        date: kotlinx.datetime.LocalDate?,
+        dayOfWeek: Int?,
+        intervalWeeks: Int,
+        keepEverySemester: Boolean,
+        allowOutsideSemester: Boolean = false
+    ) {
+        if (subject.isBlank() || bells.isEmpty()) return
+        val baseDate = date
+        val semesterKey = baseDate?.let { DateUtils.currentSemesterKey(it) } ?: DateUtils.currentSemesterKey()
+        val bounds = DateUtils.semesterBounds(semesterKey)
+        val clampedDate = if (!allowOutsideSemester && baseDate != null && bounds != null) {
+            when {
+                baseDate < bounds.first -> bounds.first
+                baseDate > bounds.second -> bounds.second
+                else -> baseDate
+            }
+        } else baseDate
+
+        val teachers = teacher.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val classrooms = classroom.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val groups = group.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val createdAt = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        val lessons = bells.map { (bellNumber, times) ->
+            CustomLesson(
+                targetId = targetId,
+                subject = subject.trim(),
+                lessonType = lessonType,
+                teachers = teachers,
+                classrooms = classrooms,
+                groups = groups,
+                bellNumber = bellNumber.coerceIn(1, 10),
+                startTime = times.first,
+                endTime = times.second,
+                isRecurring = isRecurring,
+                date = if (isRecurring) null else clampedDate,
+                anchorDate = if (isRecurring) clampedDate else null,
+                dayOfWeek = if (isRecurring) (dayOfWeek ?: clampedDate?.let { DateUtils.isoDayNumber(it.dayOfWeek) } ?: 1) else null,
+                intervalWeeks = if (isRecurring) intervalWeeks.coerceIn(1, 12) else 0,
+                keepEverySemester = keepEverySemester,
+                createdSemesterKey = semesterKey,
+                allowOutsideSemester = allowOutsideSemester,
+                createdAt = createdAt
+            )
+        }
+        repository.addCustomLessons(lessons)
+    }
+
+    fun removeCustomLesson(id: String) {
+        repository.removeCustomLesson(id)
+    }
+
+    fun updateCustomLesson(
+        existing: CustomLesson,
+        subject: String,
+        lessonType: com.jetbrains.kmpapp.data.model.LessonType,
+        teacher: String,
+        classroom: String,
+        group: String,
+        bellNumber: Int,
+        startTime: String,
+        endTime: String,
+        isRecurring: Boolean,
+        date: kotlinx.datetime.LocalDate?,
+        dayOfWeek: Int?,
+        intervalWeeks: Int,
+        keepEverySemester: Boolean,
+        allowOutsideSemester: Boolean = false
+    ) {
+        if (subject.isBlank()) return
+        val baseDate = date
+        val semesterKey = baseDate?.let { DateUtils.currentSemesterKey(it) } ?: existing.createdSemesterKey
+        val bounds = DateUtils.semesterBounds(semesterKey)
+        val clampedDate = if (!allowOutsideSemester && baseDate != null && bounds != null) {
+            when {
+                baseDate < bounds.first -> bounds.first
+                baseDate > bounds.second -> bounds.second
+                else -> baseDate
+            }
+        } else baseDate
+
+        val updated = existing.copy(
+            subject = subject.trim(),
+            lessonType = lessonType,
+            teachers = teacher.split(",").map { it.trim() }.filter { it.isNotBlank() },
+            classrooms = classroom.split(",").map { it.trim() }.filter { it.isNotBlank() },
+            groups = group.split(",").map { it.trim() }.filter { it.isNotBlank() },
+            bellNumber = bellNumber.coerceIn(1, 10),
+            startTime = startTime,
+            endTime = endTime,
+            isRecurring = isRecurring,
+            date = if (isRecurring) null else clampedDate,
+            anchorDate = if (isRecurring) clampedDate else null,
+            dayOfWeek = if (isRecurring) (dayOfWeek ?: clampedDate?.let { DateUtils.isoDayNumber(it.dayOfWeek) } ?: 1) else null,
+            intervalWeeks = if (isRecurring) intervalWeeks.coerceIn(1, 12) else 0,
+            keepEverySemester = keepEverySemester,
+            createdSemesterKey = semesterKey,
+            allowOutsideSemester = allowOutsideSemester
+        )
+        repository.updateCustomLesson(updated)
     }
 
     fun selectTarget(target: ScheduleTarget) {
@@ -215,6 +417,85 @@ class ScheduleViewModel(
     suspend fun search(query: String): List<ScheduleTarget> {
         return repository.search(query)
     }
+
+    fun addExtraLessons(
+        targetId: Int,
+        subject: String,
+        lessonType: com.jetbrains.kmpapp.data.model.LessonType,
+        teacher: String,
+        classroom: String,
+        group: String,
+        bells: List<Pair<Int, Pair<String, String>>>,
+        isRecurring: Boolean,
+        date: kotlinx.datetime.LocalDate?,
+        dayOfWeek: Int?,
+        intervalWeeks: Int
+    ) {
+        if (subject.isBlank() || bells.isEmpty()) return
+        val teachers = teacher.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val classrooms = classroom.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val groups = group.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val createdAt = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        val lessons = bells.map { (bellNumber, times) ->
+            ExtraLesson(
+                targetId = targetId,
+                subject = subject.trim(),
+                lessonType = lessonType,
+                teachers = teachers,
+                classrooms = classrooms,
+                groups = groups,
+                bellNumber = bellNumber.coerceIn(1, 10),
+                startTime = times.first,
+                endTime = times.second,
+                isRecurring = isRecurring,
+                date = if (isRecurring) null else date,
+                anchorDate = if (isRecurring) date else null,
+                dayOfWeek = if (isRecurring) (dayOfWeek ?: date?.let { DateUtils.isoDayNumber(it.dayOfWeek) } ?: 1) else null,
+                intervalWeeks = if (isRecurring) intervalWeeks.coerceIn(1, 12) else 0,
+                createdAt = createdAt
+            )
+        }
+        repository.addExtraLessons(lessons)
+    }
+
+    fun removeExtraLesson(id: String) {
+        repository.removeExtraLesson(id)
+    }
+
+    fun updateExtraLesson(
+        existing: ExtraLesson,
+        subject: String,
+        lessonType: com.jetbrains.kmpapp.data.model.LessonType,
+        teacher: String,
+        classroom: String,
+        group: String,
+        bellNumber: Int,
+        startTime: String,
+        endTime: String,
+        isRecurring: Boolean,
+        date: kotlinx.datetime.LocalDate?,
+        dayOfWeek: Int?,
+        intervalWeeks: Int
+    ) {
+        if (subject.isBlank()) return
+        val updated = existing.copy(
+            subject = subject.trim(),
+            lessonType = lessonType,
+            teachers = teacher.split(",").map { it.trim() }.filter { it.isNotBlank() },
+            classrooms = classroom.split(",").map { it.trim() }.filter { it.isNotBlank() },
+            groups = group.split(",").map { it.trim() }.filter { it.isNotBlank() },
+            bellNumber = bellNumber.coerceIn(1, 10),
+            startTime = startTime,
+            endTime = endTime,
+            isRecurring = isRecurring,
+            date = if (isRecurring) null else date,
+            anchorDate = if (isRecurring) date else null,
+            dayOfWeek = if (isRecurring) (dayOfWeek ?: date?.let { DateUtils.isoDayNumber(it.dayOfWeek) } ?: 1) else null,
+            intervalWeeks = if (isRecurring) intervalWeeks.coerceIn(1, 12) else 0
+        )
+        repository.updateExtraLesson(updated)
+    }
+
 }
 
 data class DayLessonSummary(

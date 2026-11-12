@@ -60,7 +60,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jetbrains.kmpapp.data.model.ScheduleSlot
 import com.jetbrains.kmpapp.data.model.AttendanceStatus
+import com.jetbrains.kmpapp.data.model.ScheduleTargetType
+import com.jetbrains.kmpapp.data.model.lessonNoteKey
 import com.jetbrains.kmpapp.data.model.seriesKey
+import com.jetbrains.kmpapp.data.model.subjectNoteKey
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -77,6 +80,22 @@ fun ScheduleScreen(
     modifier: Modifier = Modifier
 ) {
     val selectedLessonForDetail by viewModel.selectedLessonForDetail.collectAsState()
+    val selectedTarget by viewModel.selectedTarget.collectAsState()
+    val lessonNotes by viewModel.lessonNotes.collectAsState()
+    val subjectNotes by viewModel.subjectNotes.collectAsState()
+    val customLessons by viewModel.customLessons.collectAsState()
+    val extraLessons by viewModel.extraLessons.collectAsState()
+    val currentLessons by viewModel.currentLessons.collectAsState()
+    val selectedDate by viewModel.selectedDate.collectAsState()
+    val scope = rememberCoroutineScope()
+    var showCustomLessonSheet by remember { mutableStateOf(false) }
+    var editingCustomLesson by remember { mutableStateOf<com.jetbrains.kmpapp.data.model.CustomLesson?>(null) }
+    var editingExtraLesson by remember { mutableStateOf<com.jetbrains.kmpapp.data.model.ExtraLesson?>(null) }
+    val customLessonTemplates = remember(currentLessons) { buildLessonTemplates(currentLessons) }
+    val hasLessonsBeforeToday = remember(currentLessons) {
+        val today = com.jetbrains.kmpapp.data.model.DateUtils.today()
+        currentLessons.any { it.date < today }
+    }
 
     AnimatedContent(
         targetState = selectedLessonForDetail,
@@ -94,20 +113,208 @@ fun ScheduleScreen(
         modifier = modifier.fillMaxSize()
     ) { detailLesson ->
         if (detailLesson != null) {
+            val targetId = selectedTarget?.id ?: 0
+            val isEditableCustom = detailLesson.id.startsWith("custom_") || detailLesson.id.startsWith("extra_")
             LessonDetailScreen(
                 lesson = detailLesson,
-                onBack = { viewModel.selectLessonForDetail(null) }
+                targetId = targetId,
+                lessonNote = if (targetId != 0) lessonNotes[lessonNoteKey(targetId, detailLesson.date, detailLesson.bellNumber)] else null,
+                subjectNote = if (targetId != 0) subjectNotes[subjectNoteKey(targetId, detailLesson.subject)] else null,
+                isCustom = isEditableCustom,
+                onBack = { viewModel.selectLessonForDetail(null) },
+                onOpenEntity = { name, type ->
+                    scope.launch {
+                        viewModel.resolveAndOpenTarget(name, type)
+                    }
+                },
+                onSaveLessonNote = { text ->
+                    if (targetId != 0) viewModel.setLessonNote(targetId, detailLesson, text)
+                },
+                onSaveSubjectNote = { text ->
+                    if (targetId != 0) viewModel.setSubjectNote(targetId, detailLesson, text)
+                },
+                onEditCustom = {
+                    if (detailLesson.id.startsWith("extra_")) {
+                        val extraId = detailLesson.id.removePrefix("extra_").substringBeforeLast("_")
+                        editingExtraLesson = extraLessons.firstOrNull { it.id == extraId }
+                    } else {
+                        val customId = detailLesson.id.removePrefix("custom_").substringBeforeLast("_")
+                        editingCustomLesson = customLessons.firstOrNull { it.id == customId }
+                    }
+                },
+                onDeleteCustom = {
+                    if (detailLesson.id.startsWith("extra_")) {
+                        val extraId = detailLesson.id.removePrefix("extra_").substringBeforeLast("_")
+                        viewModel.removeExtraLesson(extraId)
+                    } else {
+                        val customId = detailLesson.id.removePrefix("custom_").substringBeforeLast("_")
+                        viewModel.removeCustomLesson(customId)
+                    }
+                }
             )
         } else {
-            ScheduleMainContent(viewModel = viewModel)
+            ScheduleMainContent(
+                viewModel = viewModel,
+                onAddCustomLesson = { showCustomLessonSheet = true }
+            )
         }
     }
+
+    if (showCustomLessonSheet) {
+        val target = selectedTarget
+        if (target != null) {
+            CustomLessonBottomSheet(
+                targetId = target.id,
+                initialDate = selectedDate,
+                templates = customLessonTemplates,
+                hasLessonsBeforeToday = hasLessonsBeforeToday,
+                onDismiss = { showCustomLessonSheet = false },
+                onAdd = { subject, lessonType, teacher, classroom, group, bells, isRecurring, date, dayOfWeek, intervalWeeks, keepEverySemester, allowOutsideSemester, saveAsExtra ->
+                    if (saveAsExtra) {
+                        viewModel.addExtraLessons(
+                            targetId = target.id,
+                            subject = subject,
+                            lessonType = lessonType,
+                            teacher = teacher,
+                            classroom = classroom,
+                            group = group,
+                            bells = bells,
+                            isRecurring = isRecurring,
+                            date = date,
+                            dayOfWeek = dayOfWeek,
+                            intervalWeeks = intervalWeeks
+                        )
+                    } else {
+                        viewModel.addCustomLessons(
+                            targetId = target.id,
+                            subject = subject,
+                            lessonType = lessonType,
+                            teacher = teacher,
+                            classroom = classroom,
+                            group = group,
+                            bells = bells,
+                            isRecurring = isRecurring,
+                            date = date,
+                            dayOfWeek = dayOfWeek,
+                            intervalWeeks = intervalWeeks,
+                            keepEverySemester = keepEverySemester,
+                            allowOutsideSemester = allowOutsideSemester
+                        )
+                    }
+                    showCustomLessonSheet = false
+                }
+            )
+        } else {
+            showCustomLessonSheet = false
+        }
+    }
+
+    editingCustomLesson?.let { lessonToEdit ->
+        val target = selectedTarget
+        if (target != null) {
+            CustomLessonBottomSheet(
+                targetId = target.id,
+                initialDate = lessonToEdit.date ?: lessonToEdit.anchorDate ?: selectedDate,
+                templates = emptyList(),
+                editingLesson = lessonToEdit,
+                hasLessonsBeforeToday = hasLessonsBeforeToday,
+                onDismiss = { editingCustomLesson = null },
+                onAdd = { subject, lessonType, teacher, classroom, group, bells, isRecurring, date, dayOfWeek, intervalWeeks, keepEverySemester, allowOutsideSemester, saveAsExtra ->
+                    val bell = bells.firstOrNull()
+                    if (bell != null) {
+                        if (saveAsExtra) {
+                            // convert edited custom to extra if user chose out-of-semester; keep simple: update as custom with flag
+                            viewModel.updateCustomLesson(
+                                existing = lessonToEdit,
+                                subject = subject,
+                                lessonType = lessonType,
+                                teacher = teacher,
+                                classroom = classroom,
+                                group = group,
+                                bellNumber = bell.first,
+                                startTime = bell.second.first,
+                                endTime = bell.second.second,
+                                isRecurring = isRecurring,
+                                date = date,
+                                dayOfWeek = dayOfWeek,
+                                intervalWeeks = intervalWeeks,
+                                keepEverySemester = keepEverySemester,
+                                allowOutsideSemester = true
+                            )
+                        } else {
+                            viewModel.updateCustomLesson(
+                                existing = lessonToEdit,
+                                subject = subject,
+                                lessonType = lessonType,
+                                teacher = teacher,
+                                classroom = classroom,
+                                group = group,
+                                bellNumber = bell.first,
+                                startTime = bell.second.first,
+                                endTime = bell.second.second,
+                                isRecurring = isRecurring,
+                                date = date,
+                                dayOfWeek = dayOfWeek,
+                                intervalWeeks = intervalWeeks,
+                                keepEverySemester = keepEverySemester,
+                                allowOutsideSemester = allowOutsideSemester
+                            )
+                        }
+                    }
+                    editingCustomLesson = null
+                    viewModel.selectLessonForDetail(null)
+                }
+            )
+        } else {
+            editingCustomLesson = null
+        }
+    }
+
+    editingExtraLesson?.let { extraToEdit ->
+        val target = selectedTarget
+        if (target != null) {
+            CustomLessonBottomSheet(
+                targetId = target.id,
+                initialDate = extraToEdit.date ?: extraToEdit.anchorDate ?: selectedDate,
+                templates = emptyList(),
+                editingExtraLesson = extraToEdit,
+                hasLessonsBeforeToday = hasLessonsBeforeToday,
+                onDismiss = { editingExtraLesson = null },
+                onAdd = { subject, lessonType, teacher, classroom, group, bells, isRecurring, date, dayOfWeek, intervalWeeks, keepEverySemester, allowOutsideSemester, saveAsExtra ->
+                    val bell = bells.firstOrNull()
+                    if (bell != null) {
+                        viewModel.updateExtraLesson(
+                            existing = extraToEdit,
+                            subject = subject,
+                            lessonType = lessonType,
+                            teacher = teacher,
+                            classroom = classroom,
+                            group = group,
+                            bellNumber = bell.first,
+                            startTime = bell.second.first,
+                            endTime = bell.second.second,
+                            isRecurring = isRecurring,
+                            date = date,
+                            dayOfWeek = dayOfWeek,
+                            intervalWeeks = intervalWeeks
+                        )
+                    }
+                    editingExtraLesson = null
+                    viewModel.selectLessonForDetail(null)
+                }
+            )
+        } else {
+            editingExtraLesson = null
+        }
+    }
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ScheduleMainContent(
     viewModel: ScheduleViewModel,
+    onAddCustomLesson: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val savedTargets by viewModel.savedTargets.collectAsState()
@@ -125,6 +332,7 @@ private fun ScheduleMainContent(
     val showAbbreviatedNames by viewModel.showAbbreviatedNames.collectAsState()
     val currentMinutes by viewModel.currentMinutes.collectAsState()
     val attendanceRules by viewModel.attendanceRules.collectAsState()
+    val lessonVisits by viewModel.lessonVisits.collectAsState()
 
     val sortedLessonDates = remember(currentLessons) {
         currentLessons.map { it.date }.distinct().sorted()
@@ -279,6 +487,21 @@ private fun ScheduleMainContent(
                         }
                     }
                 }
+            }
+        }
+
+        // Floating add custom lesson button
+        if (selectedTarget != null) {
+            Button(
+                onClick = onAddCustomLesson,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 118.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("Пара", fontWeight = FontWeight.Bold)
             }
         }
 

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.Card
@@ -39,6 +40,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -46,9 +54,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jetbrains.kmpapp.data.model.ThemeMode
+import com.jetbrains.kmpapp.data.model.DefaultSubjectColors
 import com.jetbrains.kmpapp.screens.components.PlatformBackHandler
 import com.jetbrains.kmpapp.screens.components.swipeToDismissBack
 
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -56,6 +66,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.jetbrains.kmpapp.data.model.ReminderSettings
+import kotlin.math.max
+import kotlin.math.min
 
 @Composable
 fun SettingsScreen(
@@ -75,6 +88,13 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsState()
     val isSakuraTheme by viewModel.isSakuraTheme.collectAsState()
     val betaChannel by viewModel.betaChannel.collectAsState()
+    val shareAttendanceEnabled by viewModel.shareAttendanceEnabled.collectAsState()
+    val reminderSettings by viewModel.reminderSettings.collectAsState()
+    val subjectColorOverrides by viewModel.subjectColorOverrides.collectAsState()
+    val customSubjectColors by viewModel.customSubjectColors.collectAsState()
+    val currentSubjectNames by viewModel.currentSubjectNames.collectAsState()
+    var editingSubjectColor by remember { mutableStateOf<String?>(null) }
+    var customHexInput by remember { mutableStateOf("") }
 
     var sakuraTapCount by remember { mutableIntStateOf(0) }
     var lastSakuraTapMark by remember { mutableStateOf<kotlin.time.TimeMark?>(null) }
@@ -364,7 +384,120 @@ fun SettingsScreen(
                 }
             }
 
-            // Section: Updates
+            // Section: Reminders
+            SettingsSectionCard(
+                title = "Напоминания о парах",
+                icon = Icons.Default.Notifications
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Локальные напоминания",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Уведомление перед началом пары. Если пара отмечена как «Не буду», уведомление не придёт.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = reminderSettings.enabled,
+                        onCheckedChange = { viewModel.setReminderSettings(reminderSettings.copy(enabled = it)) }
+                    )
+                }
+
+                if (reminderSettings.enabled) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "За сколько минут напоминать",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TextButton(
+                            onClick = {
+                                val m = max(5, reminderSettings.minutesBefore - 5)
+                                viewModel.setReminderSettings(reminderSettings.copy(minutesBefore = m))
+                            }
+                        ) { Text("−5") }
+                        Text(
+                            text = "${reminderSettings.minutesBefore} мин",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center
+                        )
+                        TextButton(
+                            onClick = {
+                                val m = min(120, reminderSettings.minutesBefore + 5)
+                                viewModel.setReminderSettings(reminderSettings.copy(minutesBefore = m))
+                            }
+                        ) { Text("+5") }
+                    }
+                    Text(
+                        text = "На Android могут потребоваться разрешения на уведомления и точные будильники.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Section: Sharing
+            SettingsSectionCard(
+                title = "Поделиться",
+                icon = Icons.Default.Share
+            ) {
+                Text(
+                    text = "Скачать последнюю версию",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Страница релизов и прямая ссылка на APK",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { viewModel.shareCustomLessons() }
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Поделиться моими парами",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+            }
             SettingsSectionCard(
                 title = "Обновления",
                 icon = Icons.Default.Update
@@ -393,16 +526,140 @@ fun SettingsScreen(
                         onCheckedChange = { viewModel.setBetaChannel(it) }
                     )
                 }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+
+                Text(
+                    text = "...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Прямая ссылка на скачивание APK",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { viewModel.openUrl("https://github.com/KiraSunshine/Dongau-Schedule/releases/latest") }
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Страница последнего релиза",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { viewModel.openUrl("https://github.com/KiraSunshine/Dongau-Schedule/releases/download/v27.0.1/Dongau-Schedule-27.0.1.apk") }
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Прямая ссылка на скачивание APK",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "v27.0.1 (прямая актуальная версия)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(80.dp))
         }
     }
 
+    editingSubjectColor?.let { subject ->
+        val key = subject.trim().lowercase()
+        val palette = (DefaultSubjectColors + customSubjectColors).distinct()
+        AlertDialog(
+            onDismissRequest = { editingSubjectColor = null },
+            title = { Text("Цвет предмета", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(subject, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        palette.forEach { hex ->
+                            val selected = subjectColorOverrides[key]?.equals(hex, ignoreCase = true) == true
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(parseSettingsHexColor(hex))
+                                    .border(
+                                        width = if (selected) 3.dp else 1.dp,
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { viewModel.setSubjectColor(key, hex) }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = customHexInput,
+                        onValueChange = { customHexInput = it },
+                        label = { Text("Свой цвет (#RRGGBB)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            val hex = normalizeHexColor(customHexInput)
+                            if (hex != null) {
+                                viewModel.addCustomSubjectColor(hex)
+                                viewModel.setSubjectColor(key, hex)
+                                customHexInput = hex
+                            }
+                        }) { Text("Добавить и применить") }
+                        TextButton(onClick = { viewModel.setSubjectColor(key, null); editingSubjectColor = null }) {
+                            Text("Сбросить")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { editingSubjectColor = null }) { Text("Готово") }
+            }
+        )
+    }
+
     if (showSakuraDialog) {
         AlertDialog(
             onDismissRequest = { showSakuraDialog = false },
-            title = { Text("Сакура 🌸", fontWeight = FontWeight.Bold) },
+            title = { Text("Цвет предмета", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     Text(
@@ -478,5 +735,28 @@ private fun SettingsSectionCard(
             Spacer(modifier = Modifier.height(14.dp))
             content()
         }
+    }
+}
+
+
+
+private fun parseSettingsHexColor(hexRaw: String): Color {
+    val hex = hexRaw.trim().removePrefix("#")
+    return try {
+        when (hex.length) {
+            6 -> Color(("FF$hex").toLong(16))
+            8 -> Color(hex.toLong(16))
+            else -> Color(0xFF6750A4)
+        }
+    } catch (_: Exception) {
+        Color(0xFF6750A4)
+    }
+}
+
+private fun normalizeHexColor(input: String): String? {
+    val hex = input.trim().removePrefix("#")
+    return when (hex.length) {
+        6, 8 -> "#${hex.uppercase()}"
+        else -> null
     }
 }

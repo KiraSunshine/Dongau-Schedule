@@ -99,7 +99,6 @@ object DateUtils {
             Month.DECEMBER -> "Декабрь"
         }
     }
-
     fun currentTimeMinutes(): Int {
         val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         return now.hour * 60 + now.minute
@@ -111,6 +110,50 @@ object DateUtils {
         val h = parts[0].toIntOrNull() ?: return null
         val m = parts[1].toIntOrNull() ?: return null
         return h * 60 + m
+    }
+
+    fun currentSemesterKey(date: LocalDate = today()): String {
+        val monthNum = date.month.ordinal + 1
+        return if (monthNum in 2..8) {
+            "${date.year}-2"
+        } else {
+            val startYear = if (monthNum == 1) date.year - 1 else date.year
+            "$startYear-1"
+        }
+    }
+
+    /** Календарные границы семестра для ключа вида "YYYY-1"/"YYYY-2". */
+    fun semesterBounds(key: String): Pair<LocalDate, LocalDate>? {
+        val parts = key.split("-")
+        if (parts.size != 2) return null
+        val year = parts[0].toIntOrNull() ?: return null
+        return when (parts[1]) {
+            // Чётный семестр: 01.02 — 30.06
+            "2" -> LocalDate(year, 2, 1) to LocalDate(year, 6, 30)
+            // Нечётный семестр: 01.09 — 29.12
+            "1" -> LocalDate(year, 9, 1) to LocalDate(year, 12, 29)
+            else -> null
+        }
+    }
+
+    fun semesterBoundsForDate(date: LocalDate): Pair<LocalDate, LocalDate> {
+        val key = currentSemesterKey(date)
+        return semesterBounds(key) ?: (LocalDate(date.year, 1, 1) to LocalDate(date.year, 12, 31))
+    }
+
+    fun isDateInSemester(date: LocalDate, key: String): Boolean {
+        val bounds = semesterBounds(key) ?: return true
+        return date >= bounds.first && date <= bounds.second
+    }
+
+    fun isoDayNumber(dayOfWeek: DayOfWeek): Int = when (dayOfWeek) {
+        DayOfWeek.MONDAY -> 1
+        DayOfWeek.TUESDAY -> 2
+        DayOfWeek.WEDNESDAY -> 3
+        DayOfWeek.THURSDAY -> 4
+        DayOfWeek.FRIDAY -> 5
+        DayOfWeek.SATURDAY -> 6
+        DayOfWeek.SUNDAY -> 7
     }
 
     /**

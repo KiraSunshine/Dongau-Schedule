@@ -80,8 +80,10 @@ fun WeekCalendarStrip(
     val currentWeekEnd = currentWeekMonday.plus(DatePeriod(days = 7))
     val todayInCurrentWeek = today >= currentWeekMonday && today < currentWeekEnd
     val weekInfo = DateUtils.getWeekInfo(currentWeekMonday)
-    val monthTitle = DateUtils.formatMonthTitle(currentWeekMonday.month)
-    val year = currentWeekMonday.year
+    val selectedInCurrentWeek = selectedDate >= currentWeekMonday && selectedDate < currentWeekEnd
+    val titleDate = if (selectedInCurrentWeek) selectedDate else currentWeekMonday
+    val monthTitle = DateUtils.formatMonthTitle(titleDate.month)
+    val year = titleDate.year
 
     Column(modifier = modifier.fillMaxWidth()) {
         // Month, Year, Week bar with navigation arrows & Сегодня button

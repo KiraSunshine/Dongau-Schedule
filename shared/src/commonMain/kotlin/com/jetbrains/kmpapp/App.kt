@@ -26,8 +26,8 @@ import com.jetbrains.kmpapp.screens.components.AppTab
 import com.jetbrains.kmpapp.screens.components.FloatingDock
 import com.jetbrains.kmpapp.screens.other.OtherScreen
 import com.jetbrains.kmpapp.screens.other.OtherViewModel
-import com.jetbrains.kmpapp.screens.rooms.FreeRoomsScreen
-import com.jetbrains.kmpapp.screens.rooms.FreeRoomsViewModel
+import com.jetbrains.kmpapp.screens.progress.ProgressScreen
+import com.jetbrains.kmpapp.screens.progress.ProgressViewModel
 import com.jetbrains.kmpapp.screens.schedule.ScheduleScreen
 import com.jetbrains.kmpapp.screens.schedule.ScheduleViewModel
 import com.jetbrains.kmpapp.screens.tasks.TasksScreen
@@ -85,7 +85,7 @@ fun App() {
 
     val scheduleViewModel: ScheduleViewModel = koinViewModel()
     val otherViewModel: OtherViewModel = koinViewModel()
-    val freeRoomsViewModel: FreeRoomsViewModel = koinViewModel()
+    val progressViewModel: ProgressViewModel = koinViewModel()
     val tasksViewModel: TasksViewModel = koinViewModel()
 
     val systemDark = isSystemInDarkTheme()
@@ -115,8 +115,8 @@ fun App() {
                         AppTab.SCHEDULE -> {
                             ScheduleScreen(viewModel = scheduleViewModel)
                         }
-                        AppTab.FREE_ROOMS -> {
-                            FreeRoomsScreen(viewModel = freeRoomsViewModel)
+                        AppTab.PROGRESS -> {
+                            ProgressScreen(viewModel = progressViewModel)
                         }
                         AppTab.TASKS -> {
                             TasksScreen(viewModel = tasksViewModel)
@@ -142,8 +142,8 @@ fun App() {
                                 AppTab.SCHEDULE -> {
                                     scheduleViewModel.selectLessonForDetail(null)
                                 }
-                                AppTab.FREE_ROOMS -> {
-                                    freeRoomsViewModel.selectRoomForDetail(null)
+                                AppTab.PROGRESS -> {
+                                    progressViewModel.selectSubject(null)
                                 }
                                 AppTab.TASKS -> {}
                                 AppTab.OTHER -> {

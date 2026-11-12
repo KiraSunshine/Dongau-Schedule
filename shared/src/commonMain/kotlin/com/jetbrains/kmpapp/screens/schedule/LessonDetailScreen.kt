@@ -1,6 +1,7 @@
 package com.jetbrains.kmpapp.screens.schedule
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +21,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -33,11 +36,17 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,9 +59,12 @@ import com.jetbrains.kmpapp.data.model.AssessmentType
 import com.jetbrains.kmpapp.data.model.DateUtils
 import com.jetbrains.kmpapp.data.model.DefaultSubjectColors
 import com.jetbrains.kmpapp.data.model.Lesson
+import com.jetbrains.kmpapp.data.model.LessonNote
 import com.jetbrains.kmpapp.data.model.LessonType
+import com.jetbrains.kmpapp.data.model.ScheduleTargetType
 import com.jetbrains.kmpapp.data.model.Subject
 import com.jetbrains.kmpapp.data.model.SubjectImportance
+import com.jetbrains.kmpapp.data.model.SubjectNote
 import com.jetbrains.kmpapp.screens.components.PlatformBackHandler
 import com.jetbrains.kmpapp.screens.components.swipeToDismissBack
 import org.koin.compose.koinInject
@@ -61,7 +73,16 @@ import kotlin.time.Clock
 @Composable
 fun LessonDetailScreen(
     lesson: Lesson,
+    targetId: Int = 0,
+    lessonNote: LessonNote? = null,
+    subjectNote: SubjectNote? = null,
+    isCustom: Boolean = false,
     onBack: () -> Unit,
+    onOpenEntity: (name: String, type: ScheduleTargetType) -> Unit = { _, _ -> },
+    onSaveLessonNote: (text: String) -> Unit = {},
+    onSaveSubjectNote: (text: String) -> Unit = {},
+    onEditCustom: () -> Unit = {},
+    onDeleteCustom: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     PlatformBackHandler(onBack = onBack)
@@ -73,6 +94,14 @@ fun LessonDetailScreen(
 
     val weekInfo = DateUtils.getWeekInfo(lesson.date)
     val parityStr = if (weekInfo.isEven) "Чётная неделя" else "Нечётная неделя"
+
+    var lessonNoteText by remember(lessonNote?.text, targetId, lesson.id) { mutableStateOf(lessonNote?.text.orEmpty()) }
+    var subjectNoteText by remember(subjectNote?.text, targetId, lesson.subject) { mutableStateOf(subjectNote?.text.orEmpty()) }
+    var editLessonNote by remember(targetId, lesson.id) { mutableStateOf(false) }
+    var editSubjectNote by remember(targetId, lesson.subject) { mutableStateOf(false) }
+
+    LaunchedEffect(lessonNote?.text) { lessonNoteText = lessonNote?.text.orEmpty() }
+    LaunchedEffect(subjectNote?.text) { subjectNoteText = subjectNote?.text.orEmpty() }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -172,11 +201,9 @@ fun LessonDetailScreen(
                 ) {
                     lesson.teachers.forEachIndexed { index, teacher ->
                         if (index > 0) Spacer(modifier = Modifier.height(8.dp))
-                        Text(
+                        ClickableEntityText(
                             text = teacher,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            onClick = { onOpenEntity(teacher, ScheduleTargetType.TEACHER) }
                         )
                     }
                 }
@@ -190,11 +217,9 @@ fun LessonDetailScreen(
                 ) {
                     lesson.classrooms.forEachIndexed { index, room ->
                         if (index > 0) Spacer(modifier = Modifier.height(8.dp))
-                        Text(
+                        ClickableEntityText(
                             text = room,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            onClick = { onOpenEntity(room, ScheduleTargetType.AUDITORIUM) }
                         )
                     }
                 }
@@ -206,12 +231,152 @@ fun LessonDetailScreen(
                     title = if (lesson.groups.size > 1) "Группы" else "Группа",
                     icon = Icons.Default.Group
                 ) {
-                    Text(
-                        text = lesson.groups.joinToString(", "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    lesson.groups.forEachIndexed { index, group ->
+                        if (index > 0) Spacer(modifier = Modifier.height(8.dp))
+                        ClickableEntityText(
+                            text = group,
+                            onClick = { onOpenEntity(group, ScheduleTargetType.GROUP) }
+                        )
+                    }
                 }
+            }
+
+            // Notes
+            if (targetId != 0) {
+                DetailSectionCard(
+                    title = "Заметка к этой паре",
+                    icon = Icons.Default.EditNote
+                ) {
+                    if (editLessonNote || lessonNoteText.isNotBlank()) {
+                        OutlinedTextField(
+                            value = lessonNoteText,
+                            onValueChange = { lessonNoteText = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Например: принести отчёт, подготовить вопросы…") },
+                            minLines = 2,
+                            maxLines = 6
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                onSaveLessonNote(lessonNoteText)
+                                editLessonNote = false
+                            }) { Text("Сохранить") }
+                            if (lessonNoteText.isNotBlank()) {
+                                TextButton(onClick = {
+                                    lessonNoteText = ""
+                                    onSaveLessonNote("")
+                                    editLessonNote = false
+                                }) { Text("Удалить") }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Нет заметки. Нажмите, чтобы добавить.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { editLessonNote = true }
+                                .padding(vertical = 4.dp)
+                        )
+                    }
+                }
+
+                DetailSectionCard(
+                    title = "Заметка к предмету",
+                    icon = Icons.Default.EditNote
+                ) {
+                    if (editSubjectNote || subjectNoteText.isNotBlank()) {
+                        OutlinedTextField(
+                            value = subjectNoteText,
+                            onValueChange = { subjectNoteText = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Общая заметка для всех пар этого предмета…") },
+                            minLines = 2,
+                            maxLines = 6
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = {
+                                onSaveSubjectNote(subjectNoteText)
+                                editSubjectNote = false
+                            }) { Text("Сохранить") }
+                            if (subjectNoteText.isNotBlank()) {
+                                TextButton(onClick = {
+                                    subjectNoteText = ""
+                                    onSaveSubjectNote("")
+                                    editSubjectNote = false
+                                }) { Text("Удалить") }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Нет заметки к предмету. Нажмите, чтобы добавить.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { editSubjectNote = true }
+                                .padding(vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            if (isCustom) {
+                Text(
+                    text = "Пользовательская пара",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onEditCustom,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Редактировать пару", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+                Button(
+                    onClick = {
+                        onDeleteCustom()
+                        onBack()
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Удалить пару", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+            } else {
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             Button(
@@ -271,9 +436,23 @@ fun LessonDetailScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(72.dp))
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
+}
+
+@Composable
+private fun ClickableEntityText(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 2.dp)
+    )
 }
 
 @Composable

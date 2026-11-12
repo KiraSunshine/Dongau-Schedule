@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Расписание ДонГУ</string>
+    <string name="widget_now_next_name">Сейчас / следующая пара</string>
+    <string name="widget_now_next_description">Показывает текущую и следующую пару</string>
 </resources>

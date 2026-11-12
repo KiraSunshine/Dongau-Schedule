@@ -5,16 +5,24 @@ import androidx.lifecycle.viewModelScope
 import com.jetbrains.kmpapp.data.ScheduleRepository
 import com.jetbrains.kmpapp.data.TaskRepository
 import com.jetbrains.kmpapp.data.DebugConfig
+import com.jetbrains.kmpapp.data.model.AttendanceStatus
+import com.jetbrains.kmpapp.data.model.CustomLesson
+import com.jetbrains.kmpapp.data.model.ExtraLesson
+import com.jetbrains.kmpapp.data.model.DateUtils
+import com.jetbrains.kmpapp.data.model.ReminderSettings
 import com.jetbrains.kmpapp.data.model.ScheduleTarget
 import com.jetbrains.kmpapp.data.model.ScheduleTargetType
 import com.jetbrains.kmpapp.data.model.StorageStats
 import com.jetbrains.kmpapp.data.model.ThemeMode
+import com.jetbrains.kmpapp.data.model.statusFor
+import com.jetbrains.kmpapp.data.share.PlatformShare
 import com.jetbrains.kmpapp.theme.ThemeOverlay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 
 import com.jetbrains.kmpapp.data.update.AppUpdateChecker
@@ -23,6 +31,8 @@ import com.jetbrains.kmpapp.screens.components.AppTab
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.plus
 
 enum class TargetSortOrder(val displayName: String) {
     TITLE_ASC("По названию (А → Я / 0 → 9)"),
@@ -39,6 +49,7 @@ enum class OtherSubScreen(val depth: Int) {
     DOCK_SETTINGS(2),
     TASK_SETTINGS(2),
     RESOURCES(1),
+    COMPARE(1),
     ABOUT(1),
     DEBUG_SETTINGS(2),
     EXPERIMENTAL_SETTINGS(3)
@@ -66,6 +77,21 @@ class OtherViewModel(
     val cheatsBlocked: StateFlow<Boolean> = repository.cheatsBlocked
     val dockTabs: StateFlow<List<AppTab>> = repository.dockTabs
     val betaChannel: StateFlow<Boolean> = repository.betaChannel
+    val shareAttendanceEnabled: StateFlow<Boolean> = repository.shareAttendanceEnabled
+    val reminderSettings: StateFlow<ReminderSettings> = repository.reminderSettings
+    val subjectColorOverrides: StateFlow<Map<String, String>> = repository.subjectColorOverrides
+    val customSubjectColors: StateFlow<List<String>> = repository.customSubjectColors
+    val lessonNotes = repository.lessonNotes
+    val subjectNotes = repository.subjectNotes
+    val customLessons = repository.customLessons
+    val extraLessons = repository.extraLessons
+    val currentSubjectNames: StateFlow<List<String>> = repository.currentLessons
+        .combine(repository.subjectColorOverrides) { lessons, _ ->
+            lessons.map { it.subject.trim() }.filter { it.isNotBlank() }.distinct().sorted()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val attendanceRules = repository.attendanceRules
+    val currentLessons = repository.currentLessons
 
     fun setShowLessonProgress(enabled: Boolean) {
         repository.setShowLessonProgress(enabled)
@@ -164,6 +190,10 @@ class OtherViewModel(
 
     fun setBetaChannel(enabled: Boolean) {
         repository.setBetaChannel(enabled)
+    }
+
+    fun setShareAttendanceEnabled(enabled: Boolean) {
+        repository.setShareAttendanceEnabled(enabled)
     }
 
     fun checkForUpdates() {
@@ -266,6 +296,163 @@ class OtherViewModel(
         DebugConfig.reset()
         _storageStats.value = repository.getStorageStats()
     }
+
+    fun setReminderSettings(settings: ReminderSettings) {
+        repository.setReminderSettings(settings)
+    }
+
+    fun setSubjectColor(subjectKey: String, colorHex: String?) {
+        repository.setSubjectColor(subjectKey, colorHex)
+    }
+
+    fun addCustomSubjectColor(colorHex: String) {
+        repository.addCustomSubjectColor(colorHex)
+    }
+
+    fun removeCustomSubjectColor(colorHex: String) {
+        repository.removeCustomSubjectColor(colorHex)
+    }
+
+    fun openUrl(url: String) {
+        PlatformShare.openUrl(url)
+    }
+
+    fun shareCustomLessons() {
+        viewModelScope.launch {
+            val custom = repository.customLessons.first()
+            val extra = repository.extraLessons.first()
+            val targets = repository.savedTargets.first().associateBy { it.id }
+            val text = buildCustomLessonsShareText(custom, extra, targets)
+            PlatformShare.shareText("...", text)
+        }
+    }
+
+    fun shareAttendancePlans() {
+        viewModelScope.launch {
+            if (!repository.shareAttendanceEnabled.first()) return@launch
+            val lessons = repository.currentLessons.first()
+            val rules = repository.attendanceRules.first()
+            val text = buildAttendancePlansShareText(lessons, rules)
+            PlatformShare.shareText("Планы посещения", text)
+        }
+    }
+
+    private fun buildCustomLessonsShareText(
+        custom: List<CustomLesson>,
+        extra: List<ExtraLesson>,
+        targets: Map<Int, ScheduleTarget>
+    ): String {
+        if (custom.isEmpty() && extra.isEmpty()) return "Мои созданные пары: нет созданных пар."
+        val sb = StringBuilder()
+        sb.appendLine("Мои созданные пары:")
+
+        if (custom.isNotEmpty()) {
+            fun teacherKey(lesson: CustomLesson) = lesson.teachers.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.sorted().joinToString(",")
+            val grouped = custom.groupBy { Triple(it.targetId, it.subject.trim().lowercase(), teacherKey(it)) }
+                .toList()
+                .sortedWith(compareBy({ it.first.first }, { it.first.second }))
+            grouped.forEachIndexed { index, (_, lessons) ->
+                val first = lessons.first()
+                val targetName = targets[first.targetId]?.targetTitle?.let { " [$it]" } ?: ""
+                sb.append("${index + 1}. ${first.subject}$targetName")
+                if (first.teachers.isNotEmpty()) sb.append(" — преп.: ${first.teachers.joinToString(", ")}")
+                if (first.classrooms.isNotEmpty()) sb.append(", ауд.: ${first.classrooms.joinToString(", ")}")
+                if (first.groups.isNotEmpty()) sb.append(", гр.: ${first.groups.joinToString(", ")}")
+                sb.appendLine()
+                val details = lessons.sortedWith(compareBy({ if (it.isRecurring) 0 else 1 }, { it.date ?: it.anchorDate }, { it.dayOfWeek ?: 0 }, { it.bellNumber }))
+                    .map { lesson ->
+                        val base = "${lesson.lessonType.displayName}, ${lesson.bellNumber} пара ${lesson.startTime}-${lesson.endTime}"
+                        if (lesson.isRecurring) {
+                            val dow = lesson.dayOfWeek ?: 1
+                            val dayName = DateUtils.formatDayOfWeekShort(kotlinx.datetime.DayOfWeek(dow))
+                            val period = when (lesson.intervalWeeks.coerceAtLeast(1)) {
+                                1 -> "..."
+                                2 -> "через 2 недели"
+                                else -> "через ${lesson.intervalWeeks} нед."
+                            }
+                            val sem = DateUtils.semesterBounds(lesson.createdSemesterKey)?.let { (st, en) -> " (${st}-${en})" } ?: ""
+                            val keep = if (lesson.keepEverySemester) "" else ""
+                            "$base, $dayName, $period$sem$keep"
+                        } else {
+                            "$base, дата: ${lesson.date ?: "-"}"
+                        }
+                    }.distinct()
+                details.forEach { sb.appendLine("   • $it") }
+            }
+        }
+
+        if (extra.isNotEmpty()) {
+            if (custom.isNotEmpty()) sb.appendLine()
+            sb.appendLine("Внеурочные пары (отдельный класс):")
+            fun teacherKeyE(lesson: ExtraLesson) = lesson.teachers.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.sorted().joinToString(",")
+            val grouped = extra.groupBy { Triple(it.targetId, it.subject.trim().lowercase(), teacherKeyE(it)) }
+                .toList()
+                .sortedWith(compareBy({ it.first.first }, { it.first.second }))
+            grouped.forEachIndexed { index, (_, lessons) ->
+                val first = lessons.first()
+                val targetName = targets[first.targetId]?.targetTitle?.let { " [$it]" } ?: ""
+                sb.append("${index + 1}. ${first.subject}$targetName")
+                if (first.teachers.isNotEmpty()) sb.append(" — преп.: ${first.teachers.joinToString(", ")}")
+                sb.appendLine()
+                val details = lessons.sortedWith(compareBy({ if (it.isRecurring) 0 else 1 }, { it.date ?: it.anchorDate }, { it.dayOfWeek ?: 0 }, { it.bellNumber }))
+                    .map { lesson ->
+                        val base = "${lesson.lessonType.displayName}, ${lesson.bellNumber} пара ${lesson.startTime}-${lesson.endTime}"
+                        if (lesson.isRecurring) {
+                            val dow = lesson.dayOfWeek ?: 1
+                            val dayName = DateUtils.formatDayOfWeekShort(kotlinx.datetime.DayOfWeek(dow))
+                            val period = when (lesson.intervalWeeks.coerceAtLeast(1)) { 1 -> "..."; 2 -> "через 2 недели"; else -> "через ${lesson.intervalWeeks} нед." }
+                            "$base, $dayName, $period"
+                        } else {
+                            "$base, дата: ${lesson.date ?: "-"}"
+                        }
+                    }.distinct()
+                details.forEach { sb.appendLine("   • $it") }
+            }
+        }
+        return sb.toString().trim()
+    }
+
+    private fun buildAttendancePlansShareText(
+        lessons: List<com.jetbrains.kmpapp.data.model.Lesson>,
+        rules: List<com.jetbrains.kmpapp.data.model.AttendanceRule>
+    ): String {
+        if (rules.isEmpty()) return "Нет отмеченных планов посещения."
+        val today = DateUtils.today()
+        val horizon = today.plus(DatePeriod(days = 60))
+        val relevant = lessons
+            .filter { it.date in today..horizon }
+            .sortedWith(compareBy({ it.date }, { it.bellNumber }))
+        val attending = mutableListOf<String>()
+        val skipped = mutableListOf<String>()
+        relevant.forEach { lesson ->
+            val status = rules.statusFor(lesson) ?: return@forEach
+            val line = "${lesson.date} ${DateUtils.formatDayOfWeekShort(lesson.date.dayOfWeek)} ${lesson.startTime}–${lesson.endTime}, ${lesson.bellNumber} пара — ${lesson.subject}" +
+                (lesson.classrooms.firstOrNull()?.let { " ($it)" } ?: "")
+            when (status) {
+                AttendanceStatus.ATTENDING -> attending += "Пойду: $line"
+                AttendanceStatus.SKIPPED -> skipped += "Не пойду: $line"
+                else -> {}
+            }
+        }
+        if (attending.isEmpty() && skipped.isEmpty()) {
+            return "Нет отмеченных планов посещения на ближайшие дни."
+        }
+        val sb = StringBuilder()
+        sb.appendLine("Планы посещения (ближайшие 60 дней):")
+        if (attending.isNotEmpty()) {
+            sb.appendLine()
+            sb.appendLine("Пойду:")
+            attending.forEach { sb.appendLine("• ${it.removePrefix("Пойду: ")}") }
+        }
+        if (skipped.isNotEmpty()) {
+            sb.appendLine()
+            sb.appendLine("Не пойду:")
+            skipped.forEach { sb.appendLine("• ${it.removePrefix("Не пойду: ")}") }
+        }
+        return sb.toString().trim()
+    }
+
+    suspend fun fetchLessonsForTarget(target: ScheduleTarget) = repository.fetchLessonsForTarget(target)
 
     suspend fun search(query: String): List<ScheduleTarget> {
         return repository.search(query)

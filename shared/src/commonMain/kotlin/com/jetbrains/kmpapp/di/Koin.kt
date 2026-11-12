@@ -6,9 +6,8 @@ import com.jetbrains.kmpapp.data.storage.PlatformStorage
 import com.jetbrains.kmpapp.data.storage.ScheduleStorage
 import com.jetbrains.kmpapp.data.update.AppUpdateChecker
 import com.jetbrains.kmpapp.screens.other.OtherViewModel
+import com.jetbrains.kmpapp.screens.progress.ProgressViewModel
 import com.jetbrains.kmpapp.screens.schedule.ScheduleViewModel
-import com.jetbrains.kmpapp.data.FreeRoomsRepository
-import com.jetbrains.kmpapp.screens.rooms.FreeRoomsViewModel
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.ContentType
@@ -25,6 +24,8 @@ import com.jetbrains.kmpapp.screens.tasks.TasksViewModel
 
 import com.jetbrains.kmpapp.data.power.PlatformPowerManager
 import io.ktor.client.plugins.HttpTimeout
+import com.jetbrains.kmpapp.data.notifications.LessonReminderManager
+import com.jetbrains.kmpapp.data.notifications.NoopLessonReminderManager
 
 val dataModule = module {
     single {
@@ -49,18 +50,27 @@ val dataModule = module {
     singleOf(::UnifiedSyncManager)
     singleOf(::DongauScheduleApi)
     singleOf(::ScheduleStorage)
-    singleOf(::ScheduleRepository)
+    single {
+        ScheduleRepository(
+            api = get(),
+            storage = get(),
+            powerManager = get(),
+            reminderManager = get()
+        )
+    }
     singleOf(::AppUpdateChecker)
-    singleOf(::FreeRoomsRepository)
     singleOf(::TaskRepository)
+    single<LessonReminderManager> { provideLessonReminderManager() }
 }
 
 val viewModelModule = module {
     factoryOf(::ScheduleViewModel)
     factoryOf(::OtherViewModel)
-    factoryOf(::FreeRoomsViewModel)
+    factoryOf(::ProgressViewModel)
     factoryOf(::TasksViewModel)
 }
+
+expect fun provideLessonReminderManager(): LessonReminderManager
 
 fun initKoin() {
     startKoin {

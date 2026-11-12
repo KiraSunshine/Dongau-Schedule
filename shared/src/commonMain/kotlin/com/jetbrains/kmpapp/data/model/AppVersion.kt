@@ -10,8 +10,8 @@ object AppVersion {
      *  - contributor build           → 26.X-contrib.N
      * После стабильного релиза v26.0.0 руками поднимается до 26.1.0.
      */
-    const val RELEASE_VERSION = "26.0.14"
-    const val VERSION_NAME = RELEASE_VERSION
+    const val RELEASE_VERSION = "27.0.1"
+    const val VERSION_NAME = "27.0.1"
 
     /** stable | beta | rc | dev | contrib — подставляет CI через tools/versioning.py */
     const val BUILD_CHANNEL = "stable"
@@ -21,8 +21,8 @@ object AppVersion {
      * (github.run_started_at): монотонно во всех каналах, влезает в
      * Int32 / Android versionCode (max 2147483647). github.run_id НЕ подходит.
      */
-    const val BUILD_NUMBER = 42
-    const val COMMIT_SHA = "local"
+    const val BUILD_NUMBER = 1794512178
+    const val COMMIT_SHA = "3e6fdaa"
 
     /** Стабильный канал обновлений (обновляется только стабильными релизами). */
     const val UPDATE_FEED_URL = "https://raw.githubusercontent.com/KiraSunshine/Dongau-Schedule/gh-pages/version.json"
@@ -32,7 +32,7 @@ object AppVersion {
 
     const val IS_CRITICAL = false
     const val MIN_SUPPORTED_BUILD = 1
-    const val CHANGELOG = "Расписание занятий ДонГУ (edu.dongau.ru): поиск по группам, преподавателям и аудиториям, плавное перелистывание дней с сохранением позиции, автопрокрутка к текущей паре, галерея перекрывающихся занятий с группами, сокращённые названия предметов. Аудитории: еженедельное обновление данных. Новая нумерация версий: 26.0.0 = год.релиз.патч."
+    const val CHANGELOG = "Исправлено окно экспорта/поделиться при большом числе предметов; чередование отметок «каждые N недель»; улучшена диагностика и классификация ошибок обновления расписания (E-999) и обработка null-полей ответа сервера; ограничение добавления пар раньше сегодняшнего дня (только если до сегодня нет пар и дата не в семестре старше текущего); прочие улучшения и исправления."
 
     val isTestBuild: Boolean get() = BUILD_CHANNEL != "stable"
 

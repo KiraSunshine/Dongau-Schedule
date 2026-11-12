@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,7 +40,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.LocalDate
 import kmp_app_template.shared.generated.resources.Res
 import kmp_app_template.shared.generated.resources.borzoi
+import kmp_app_template.shared.generated.resources.empty_dog_1
+import kmp_app_template.shared.generated.resources.empty_dog_2
+import kmp_app_template.shared.generated.resources.empty_dog_3
+import kmp_app_template.shared.generated.resources.empty_dog_4
+import kmp_app_template.shared.generated.resources.empty_dog_5
 import org.jetbrains.compose.resources.painterResource
+import androidx.compose.runtime.remember
+import kotlin.random.Random
 
 @Composable
 internal fun DaySchedulePage(
@@ -58,6 +66,8 @@ internal fun DaySchedulePage(
     onRetry: () -> Unit,
     onLessonClick: (Lesson) -> Unit,
     attendanceRules: List<AttendanceRule> = emptyList(),
+    lessonVisits: Map<String, com.jetbrains.kmpapp.data.model.LessonVisit> = emptyMap(),
+    targetId: Int = 0,
     onAttendanceClick: (Lesson) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -163,12 +173,24 @@ internal fun DaySchedulePage(
                     Spacer(modifier = Modifier.height(12.dp))
                     IconButton(onClick = onRetry) { Icon(Icons.Default.Refresh, contentDescription = "Повторить") }
                 } else {
+                    val emptyImages = remember(date) {
+                        listOf(
+                            Res.drawable.borzoi,
+                            Res.drawable.empty_dog_1,
+                            Res.drawable.empty_dog_2,
+                            Res.drawable.empty_dog_3,
+                            Res.drawable.empty_dog_4,
+                            Res.drawable.empty_dog_5
+                        )
+                    }
+                    val image = remember(date) { emptyImages.random() }
                     Image(
-                        painter = painterResource(Res.drawable.borzoi),
+                        painter = painterResource(image),
                         contentDescription = null,
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .height(220.dp)
+                            .height(330.dp)
+                            .fillMaxWidth(0.85f)
                             .clip(RoundedCornerShape(20.dp))
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -211,6 +233,8 @@ internal fun DaySchedulePage(
                     showAbbreviatedNames = showAbbreviatedNames,
                     scheduleTargetType = scheduleTargetType,
                     attendanceRules = attendanceRules,
+                    lessonVisits = lessonVisits,
+                    targetId = targetId,
                     onAttendanceClick = onAttendanceClick
                 )
             }

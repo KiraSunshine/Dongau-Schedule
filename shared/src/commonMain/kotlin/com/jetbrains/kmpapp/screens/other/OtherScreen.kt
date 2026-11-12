@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Tune
@@ -119,6 +120,12 @@ fun OtherScreen(
             }
             OtherSubScreen.RESOURCES -> {
                 ResourcesScreen(
+                    onBack = { viewModel.resetToRoot() }
+                )
+            }
+            OtherSubScreen.COMPARE -> {
+                CompareSchedulesScreen(
+                    viewModel = viewModel,
                     onBack = { viewModel.resetToRoot() }
                 )
             }
@@ -274,6 +281,14 @@ private fun OtherMainContent(
                 else "Сохранено: ${savedTargets.size}",
                 icon = Icons.AutoMirrored.Filled.EventNote,
                 onClick = { onNavigate(OtherSubScreen.MANAGE_SCHEDULES) }
+            )
+
+            // 3. Compare schedules card
+            OtherNavCard(
+                title = "Сравнение расписаний",
+                subtitle = "Сравнить два расписания по дате",
+                icon = Icons.Default.Compare,
+                onClick = { onNavigate(OtherSubScreen.COMPARE) }
             )
 
             // 4. Settings card

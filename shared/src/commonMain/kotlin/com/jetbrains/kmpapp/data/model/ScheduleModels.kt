@@ -191,7 +191,7 @@ data class DongauScheduleItem(
     @SerialName("кодГруппы") val groupId: Int = 0,
     @SerialName("фиоПреподавателя") val teacherFullName: String? = null,
     @SerialName("учебныйГод") val academicYear: String = "",
-    @SerialName("тема") val topic: String = ""
+    @SerialName("тема") val topic: String? = null
 )
 
 @Serializable
